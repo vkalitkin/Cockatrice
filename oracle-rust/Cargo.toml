@@ -1,0 +1,11 @@
+[package]
+name = "oracle_token_parser"
+version = "0.1.0"
+
+[lib]
+name = "oracle_token_parser"
+crate-type = ["staticlib"]
+
+[dependencies]
+parser-combinators = "0.5.1"
+libc = "0.1.8"
