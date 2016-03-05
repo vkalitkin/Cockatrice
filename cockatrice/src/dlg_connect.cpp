@@ -3,13 +3,11 @@
 #include <QComboBox>
 #include <QRadioButton>
 #include <QGridLayout>
-#include <QHBoxLayout>
 #include <QDialogButtonBox>
 #include <QDebug>
 #include <QEvent>
 #include <QKeyEvent>
 #include <QMessageBox>
-#include <iostream>
 #include "dlg_connect.h"
 #include "settingscache.h"
 
@@ -19,10 +17,11 @@ DlgConnect::DlgConnect(QWidget *parent)
     previousHostButton = new QRadioButton(tr("Previous Host"), this);
     previousHosts = new QComboBox(this);
     previousHosts->installEventFilter(new DeleteHighlightedItemWhenShiftDelPressedEventFilter);
+    previousHosts->setInsertPolicy(QComboBox::InsertAtTop);
 
-    QStringList previousHostList = settingsCache->servers().getPreviousHostList();
+    QStringList previousHostList = settingsCache->servers().getKnownHosts();
     previousHosts->addItems(previousHostList);
-    previousHosts->setCurrentIndex(settingsCache->servers().getPrevioushostindex());
+    previousHosts->setCurrentIndex(settingsCache->servers().getPreviousHostIndex());
 
     newHostButton = new QRadioButton(tr("New Host"), this);
     
@@ -45,15 +44,15 @@ DlgConnect::DlgConnect(QWidget *parent)
     passwordEdit->setEchoMode(QLineEdit::Password);
     
     savePasswordCheckBox = new QCheckBox(tr("&Save password"));
-    savePasswordCheckBox->setChecked(settingsCache->servers().getSavePassword());
+    savePasswordCheckBox->setChecked(settingsCache->servers().shouldSavePassword());
 
     autoConnectCheckBox = new QCheckBox(tr("A&uto connect at start"));
     if(savePasswordCheckBox->isChecked())
     {
-        autoConnectCheckBox->setChecked(settingsCache->servers().getAutoConnect());
+        autoConnectCheckBox->setChecked(settingsCache->servers().shouldAutoconnect());
         autoConnectCheckBox->setEnabled(true);
     } else {
-        settingsCache->servers().setAutoConnect(0);
+        settingsCache->servers().setShouldAutoconnect(0);
         autoConnectCheckBox->setChecked(0);
         autoConnectCheckBox->setEnabled(false);
     }
@@ -91,7 +90,7 @@ DlgConnect::DlgConnect(QWidget *parent)
     connect(previousHostButton, SIGNAL(toggled(bool)), this, SLOT(previousHostSelected(bool)));
     connect(newHostButton, SIGNAL(toggled(bool)), this, SLOT(newHostSelected(bool)));
 
-    if (settingsCache->servers().getPreviousHostLogin())
+    if (settingsCache->servers().getDlgConnectShouldCheckPreviousHost())
         previousHostButton->setChecked(true);
     else
         newHostButton->setChecked(true);
@@ -129,8 +128,8 @@ void DlgConnect::actOk()
     settingsCache->servers().setPort(portEdit->text());
     settingsCache->servers().setPlayerName(playernameEdit->text());
     settingsCache->servers().setPassword(savePasswordCheckBox->isChecked() ? passwordEdit->text() : QString());
-    settingsCache->servers().setSavePassword(savePasswordCheckBox->isChecked() ? 1 : 0);
-    settingsCache->servers().setAutoConnect(autoConnectCheckBox->isChecked() ? 1 : 0);
+    settingsCache->servers().setShouldSavePassword(savePasswordCheckBox->isChecked() ? 1 : 0);
+    settingsCache->servers().setShouldAutoconnect(autoConnectCheckBox->isChecked() ? 1 : 0);
     settingsCache->servers().setPreviousHostLogin(previousHostButton->isChecked() ? 1 : 0);
     
     QStringList hostList;
@@ -141,9 +140,9 @@ void DlgConnect::actOk()
     for (int i = 0; i < previousHosts->count(); i++)
         if(!previousHosts->itemText(i).trimmed().isEmpty())
             hostList << previousHosts->itemText(i);
-    
-    settingsCache->servers().setPreviousHostList(hostList);
-    settingsCache->servers().setPrevioushostindex(previousHosts->currentIndex());
+
+    settingsCache->servers().setKnownHosts(hostList);
+    settingsCache->servers().setPreviousHostIndex(previousHosts->currentIndex());
 
     if(playernameEdit->text().isEmpty())
     {
@@ -161,8 +160,8 @@ QString DlgConnect::getHost() const {
 
 void DlgConnect::actCancel()
 {
-    settingsCache->servers().setSavePassword(savePasswordCheckBox->isChecked() ? 1 : 0);
-    settingsCache->servers().setAutoConnect( autoConnectCheckBox->isChecked() ? 1 : 0);
+    settingsCache->servers().setShouldSavePassword(savePasswordCheckBox->isChecked() ? 1 : 0);
+    settingsCache->servers().setShouldAutoconnect(autoConnectCheckBox->isChecked() ? 1 : 0);
     reject();
 }
 

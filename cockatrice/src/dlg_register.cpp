@@ -14,10 +14,10 @@ DlgRegister::DlgRegister(QWidget *parent)
     : QDialog(parent)
 {
     hostLabel = new QLabel(tr("&Host:"));
-    QStringList hostList = settingsCache->servers().getPreviousHostList();
+    QStringList hostList = settingsCache->servers().getKnownHosts();
     hostEdit = new QComboBox();
     hostEdit->addItems(hostList);
-    hostEdit->setCurrentIndex(settingsCache->servers().getPrevioushostindex());
+    hostEdit->setCurrentIndex(settingsCache->servers().getPreviousHostIndex());
     hostLabel->setBuddy(hostEdit);
 
     portLabel = new QLabel(tr("&Port:"));    

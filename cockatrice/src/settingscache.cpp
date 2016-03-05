@@ -59,14 +59,14 @@ void SettingsCache::translateLegacySettings()
     //Servers
     legacySetting.beginGroup("server");
     servers().setPreviousHostLogin(legacySetting.value("previoushostlogin").toInt());
-    servers().setPreviousHostList(legacySetting.value("previoushosts").toStringList());
-    servers().setPrevioushostindex(legacySetting.value("previoushostindex").toInt());
+    servers().setKnownHosts(legacySetting.value("previoushosts").toStringList());
+    servers().setPreviousHostIndex(legacySetting.value("previoushostindex").toInt());
     servers().setHostName(legacySetting.value("hostname").toString());
     servers().setPort(legacySetting.value("port").toString());
     servers().setPlayerName(legacySetting.value("playername").toString());
     servers().setPassword(legacySetting.value("password").toString());
-    servers().setSavePassword(legacySetting.value("save_password").toInt());
-    servers().setAutoConnect(legacySetting.value("auto_connect").toInt());
+    servers().setShouldSavePassword(legacySetting.value("save_password").toInt());
+    servers().setShouldAutoconnect(legacySetting.value("auto_connect").toInt());
     usedKeys.append(legacySetting.allKeys());
     QStringList allKeysServer = legacySetting.allKeys();
     for (int i = 0; i < allKeysServer.size(); ++i) {

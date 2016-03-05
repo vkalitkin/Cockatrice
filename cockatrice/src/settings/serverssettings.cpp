@@ -1,7 +1,7 @@
 #include "serverssettings.h"
 
 ServersSettings::ServersSettings(QString settingPath, QObject *parent)
-    : SettingsManager(settingPath+"servers.ini", parent)
+        : SettingsManager(settingPath + "servers.ini", parent)
 {
 }
 
@@ -10,31 +10,30 @@ void ServersSettings::setPreviousHostLogin(int previous)
     setValue(previous, "previoushostlogin", "server");
 }
 
-int ServersSettings::getPreviousHostLogin()
+bool ServersSettings::getDlgConnectShouldCheckPreviousHost()
 {
-    QVariant previous = getValue("previoushostlogin", "server");
-    return previous == QVariant() ? 1 : previous.toInt();
+    return getValueWithDefault("previoushostlogin", true, "server").toBool();
 }
 
-void ServersSettings::setPreviousHostList(QStringList list)
+void ServersSettings::setKnownHosts(QStringList list)
 {
     setValue(list, "previoushosts", "server");
 }
 
-QStringList ServersSettings::getPreviousHostList()
+QStringList ServersSettings::getKnownHosts()
 {
     const QStringList &hosts = getValue("previoushosts", "server").toStringList();
     if (hosts.isEmpty())
-        return getDefaultHostList();
+        return getDefaultHosts();
     return hosts;
 }
 
-void ServersSettings::setPrevioushostindex(int index)
+void ServersSettings::setPreviousHostIndex(int index)
 {
     setValue(index, "previoushostindex", "server");
 }
 
-int ServersSettings::getPrevioushostindex()
+int ServersSettings::getPreviousHostIndex()
 {
     return getValue("previoushostindex", "server").toInt();
 }
@@ -51,8 +50,7 @@ void ServersSettings::setPort(QString port)
 
 QString ServersSettings::getPort(QString defaultPort)
 {
-    QVariant port = getValue("port","server");
-    return port == QVariant() ? defaultPort : port.toString();
+    return getValueWithDefault("port", defaultPort, "server").toString();
 }
 
 void ServersSettings::setPlayerName(QString playerName)
@@ -62,8 +60,7 @@ void ServersSettings::setPlayerName(QString playerName)
 
 QString ServersSettings::getPlayerName(QString defaultName)
 {
-    QVariant name = getValue("playername", "server");
-    return name == QVariant() ? defaultName : name.toString();
+    return getValueWithDefault("playername", defaultName, "server").toString();
 }
 
 void ServersSettings::setPassword(QString password)
@@ -76,24 +73,30 @@ QString ServersSettings::getPassword()
     return getValue("password", "server").toString();
 }
 
-void ServersSettings::setSavePassword(int save)
+void ServersSettings::setShouldSavePassword(bool save)
 {
     setValue(save, "save_password", "server");
 }
 
-int ServersSettings::getSavePassword()
+bool ServersSettings::shouldSavePassword()
 {
-    QVariant save = getValue("save_password", "server");
-    return save == QVariant() ? 1 : save.toInt();
+    return getValueWithDefault("save_password", false, "server").toBool();
 }
 
-void ServersSettings::setAutoConnect(int autoconnect)
+void ServersSettings::setShouldAutoconnect(int autoconnect)
 {
     setValue(autoconnect, "auto_connect", "server");
 }
 
-int ServersSettings::getAutoConnect()
+bool ServersSettings::shouldAutoconnect()
 {
-    QVariant autoconnect = getValue("auto_connect", "server");
-    return autoconnect == QVariant() ? 0 : autoconnect.toInt();
+    return getValueWithDefault("auto_connect", false, "server").toBool();
 }
+
+std::tuple<QString, int> ServersSettings::getMostRecentServerConnectionInfo()
+{
+    QString host = getKnownHosts().at(getPreviousHostIndex());
+    int port = 4747;
+    return std::make_tuple(host, port);
+};
+

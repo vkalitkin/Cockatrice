@@ -14,7 +14,7 @@ DlgEditPassword::DlgEditPassword(QWidget *parent)
     oldPasswordLabel = new QLabel(tr("Old password:"));
     oldPasswordEdit = new QLineEdit();
 
-    if(settingsCache->servers().getSavePassword())
+    if(settingsCache->servers().shouldSavePassword())
         oldPasswordEdit->setText(settingsCache->servers().getPassword());
 
     oldPasswordLabel->setBuddy(oldPasswordEdit);

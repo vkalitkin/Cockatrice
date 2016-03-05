@@ -11,42 +11,44 @@ class ServersSettings : public SettingsManager
     friend class SettingsCache;
 
 public:
-    QStringList getDefaultHostList() {
+    QStringList getDefaultHosts() {
        return QStringList()
               << "cockatrice.woogerworks.com"
               << "vps.poixen.com"
               << "chickatrice.net";
     }
 
-    int getPreviousHostLogin();
-    QStringList getPreviousHostList();
-    int getPrevioushostindex();
+    bool getDlgConnectShouldCheckPreviousHost();
+    QStringList getKnownHosts();
+    int getPreviousHostIndex();
     QString getPort(QString defaultPort = "");
     QString getPlayerName(QString defaultName = "");
     QString getPassword();
-    int getSavePassword();
-    int getAutoConnect();
+    bool shouldSavePassword();
+    bool shouldAutoconnect();
+    std::tuple<QString, int> getMostRecentServerConnectionInfo();
 
     void setPreviousHostLogin(int previous);
-    void setPreviousHostList(QStringList list);
-    void setPrevioushostindex(int index);
+    void setKnownHosts(QStringList list);
+    void setPreviousHostIndex(int index);
     void setHostName(QString hostname);
     void setPort(QString port);
     void setPlayerName(QString playerName);
     void setPassword(QString password);
-    void setSavePassword(int save);
-    void setAutoConnect(int autoconnect);
+    void setShouldSavePassword(bool shouldSavePassword);
+    void setShouldAutoconnect(int autoconnect);
 
 signals:
 
 public slots:
 
 private:
-    ServersSettings(QString settingPath,QObject *parent = 0);
+    ServersSettings(QString settingPath, QObject *parent = 0);
     ServersSettings( const ServersSettings& /*other*/ );
     ServersSettings( ServersSettings& /*other*/ );
     ServersSettings( volatile const ServersSettings& /*other*/ );
-    ServersSettings( volatile ServersSettings& /*other*/ );       
+    ServersSettings( volatile ServersSettings& /*other*/ );
+
 };
 
 #endif // SERVERSSETTINGS_H

@@ -18,7 +18,9 @@ public slots:
 
 protected:
     QSettings settings;
-    QVariant getValue(QString name, QString group = "", QString subGroup = "" );
+    QVariant getValue(const QString name, const QString group = "", const QString subGroup = "");
+    QVariant getValueWithDefault(const QString name, const QVariant defaultValue,
+                                 const QString group = "", const QString subGroup = "");
     void setValue(QVariant value, QString name, QString group = "", QString subGroup = "" );
 };
 
