@@ -10,6 +10,7 @@
 #include <QSqlQuery>
 #include <QDateTime>
 #include <QChar>
+#include <QStringList>
 
 Servatrice_DatabaseInterface::Servatrice_DatabaseInterface(int _instanceId, Servatrice *_server)
     : instanceId(_instanceId),
@@ -132,6 +133,8 @@ bool Servatrice_DatabaseInterface::usernameIsValid(const QString &user, QString 
     bool allowNumerics = settingsCache->value("users/allownumerics", true).toBool();
     bool allowPunctuationPrefix = settingsCache->value("users/allowpunctuationprefix", false).toBool();
     QString allowedPunctuation = settingsCache->value("users/allowedpunctuation", "_").toString();
+    QString disallowedWords = settingsCache->value("users/disallowedwords", "").toString();
+    QStringList disallowedWordList = disallowedWords.split(",");
     error = QString("%1|%2|%3|%4|%5|%6|%7").arg(minNameLength).arg(maxNameLength).arg(allowLowercase).arg(allowUppercase).arg(allowNumerics).arg(allowPunctuationPrefix).arg(allowedPunctuation);
 
     if (user.length() < minNameLength || user.length() > maxNameLength)
@@ -149,6 +152,9 @@ bool Servatrice_DatabaseInterface::usernameIsValid(const QString &user, QString 
         regEx.append("0-9");
     regEx.append(QRegExp::escape(allowedPunctuation));
     regEx.append("]+");
+    for (int i = 0; i < disallowedWordList.length(); i++) {
+        regEx.append(disallowedWordList.at(i));
+    }
 
     static QRegExp re = QRegExp(regEx);
     return re.exactMatch(user);

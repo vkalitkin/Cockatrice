@@ -107,6 +107,9 @@ allowedpunctuation=_.-
 ; If a username can begin with punctuation defined in allowedpunctuation
 allowpunctuationprefix=false
 
+; Define a list of words that should not be allowed in a username, not case sensative
+restrictedwords=mod,admin
+
 [registration]
 
 ; Servatrice can process registration requests to add new users on the fly.
