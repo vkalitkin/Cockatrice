@@ -18,30 +18,32 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include <QApplication>
-#include <QFile>
-#include <QTextStream>
-#include <QTextCodec>
-#include <QtPlugin>
-#include <QTranslator>
-#include <QLibraryInfo>
-#include <QDateTime>
-#include <QDir>
-#include <QDebug>
-#include <QSystemTrayIcon>
-#include "QtNetwork/QNetworkInterface"
-#include <QCryptographicHash>
 #include "main.h"
-#include "window_main.h"
-#include "dlg_settings.h"
+#include "QtNetwork/QNetworkInterface"
 #include "carddatabase.h"
-#include "settingscache.h"
-#include "thememanager.h"
-#include "pixmapgenerator.h"
-#include "rng_sfmt.h"
-#include "soundengine.h"
+#include "dlg_settings.h"
 #include "featureset.h"
 #include "logger.h"
+#include "pixmapgenerator.h"
+#include "rng_sfmt.h"
+#include "settingscache.h"
+#include "soundengine.h"
+#include "spoilerbackgroundupdater.h"
+#include "thememanager.h"
+#include "window_main.h"
+#include <QApplication>
+#include <QCryptographicHash>
+#include <QDateTime>
+#include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QLibraryInfo>
+#include <QLocale>
+#include <QSystemTrayIcon>
+#include <QTextCodec>
+#include <QTextStream>
+#include <QTranslator>
+#include <QtPlugin>
 
 CardDatabase *db;
 QTranslator *translator, *qtTranslator;
@@ -54,7 +56,8 @@ ThemeManager *themeManager;
 const QString translationPrefix = "cockatrice";
 QString translationPath;
 
-static void CockatriceLogger(QtMsgType type, const QMessageLogContext &ctx, const QString &message) {
+static void CockatriceLogger(QtMsgType type, const QMessageLogContext &ctx, const QString &message)
+{
     Logger::getInstance().log(type, ctx, message);
 }
 
@@ -66,13 +69,13 @@ void installNewTranslator()
     qApp->installTranslator(qtTranslator);
     translator->load(translationPrefix + "_" + lang, translationPath);
     qApp->installTranslator(translator);
+    qDebug() << "Language changed:" << lang;
 }
 
 QString const generateClientID()
 {
     QString macList;
-    foreach(QNetworkInterface interface, QNetworkInterface::allInterfaces())
-    {
+    foreach (QNetworkInterface interface, QNetworkInterface::allInterfaces()) {
         if (interface.hardwareAddress() != "")
             if (interface.hardwareAddress() != "00:00:00:00:00:00:00:E0")
                 macList += interface.hardwareAddress() + ".";
@@ -84,6 +87,8 @@ QString const generateClientID()
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+
+    QObject::connect(&app, SIGNAL(lastWindowClosed()), &app, SLOT(quit()));
 
     qInstallMessageHandler(CockatriceLogger);
     if (app.arguments().contains("--debug-output"))
@@ -119,16 +124,21 @@ int main(int argc, char *argv[])
     translator = new QTranslator;
     installNewTranslator();
 
-    qsrand(QDateTime::currentDateTime().toTime_t());
+    QLocale::setDefault(QLocale::English);
 
+    qsrand(QDateTime::currentDateTime().toTime_t());
     qDebug("main(): starting main program");
 
     MainWindow ui;
     qDebug("main(): MainWindow constructor finished");
 
     ui.setWindowIcon(QPixmap("theme:cockatrice"));
-    
+
     settingsCache->setClientID(generateClientID());
+
+    // If spoiler mode is enabled, we will download the spoilers
+    // then reload the DB. otherwise just reload the DB
+    SpoilerBackgroundUpdater spoilerBackgroundUpdater;
 
     ui.show();
     qDebug("main(): ui.show() finished");

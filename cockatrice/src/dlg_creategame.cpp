@@ -1,23 +1,24 @@
+#include "dlg_creategame.h"
+#include "settingscache.h"
+#include "tab_room.h"
+#include <QCheckBox>
+#include <QDialogButtonBox>
+#include <QGridLayout>
+#include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
-#include <QCheckBox>
-#include <QPushButton>
-#include <QGridLayout>
-#include <QRadioButton>
-#include <QSpinBox>
-#include <QGroupBox>
-#include <QDialogButtonBox>
 #include <QMessageBox>
+#include <QPushButton>
+#include <QRadioButton>
 #include <QSet>
+#include <QSpinBox>
 #include <QWizard>
-#include "dlg_creategame.h"
-#include "tab_room.h"
-#include "settingscache.h"
 
-#include "pending_command.h"
 #include "pb/serverinfo_game.pb.h"
+#include "pending_command.h"
 
-void DlgCreateGame::sharedCtor() {
+void DlgCreateGame::sharedCtor()
+{
     rememberGameSettings = new QCheckBox(tr("Re&member settings"));
     descriptionLabel = new QLabel(tr("&Description:"));
     descriptionEdit = new QLineEdit;
@@ -36,7 +37,8 @@ void DlgCreateGame::sharedCtor() {
     generalGrid->addWidget(descriptionEdit, 0, 1);
     generalGrid->addWidget(maxPlayersLabel, 1, 0);
     generalGrid->addWidget(maxPlayersEdit, 1, 1);
-    generalGrid->addWidget(rememberGameSettings, 2, 0);
+    generalGroupBox = new QGroupBox(tr("General"));
+    generalGroupBox->setLayout(generalGrid);
 
     QVBoxLayout *gameTypeLayout = new QVBoxLayout;
     QMapIterator<int, QString> gameTypeIterator(gameTypes);
@@ -88,10 +90,11 @@ void DlgCreateGame::sharedCtor() {
     spectatorsGroupBox->setLayout(spectatorsLayout);
 
     QGridLayout *grid = new QGridLayout;
-    grid->addLayout(generalGrid, 0, 0);
-    grid->addWidget(spectatorsGroupBox, 1, 0);
+    grid->addWidget(generalGroupBox, 0, 0);
     grid->addWidget(joinRestrictionsGroupBox, 0, 1);
-    grid->addWidget(gameTypeGroupBox, 1, 1);
+    grid->addWidget(gameTypeGroupBox, 1, 0);
+    grid->addWidget(spectatorsGroupBox, 1, 1);
+    grid->addWidget(rememberGameSettings, 2, 0);
 
     buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok);
     connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
@@ -106,7 +109,8 @@ void DlgCreateGame::sharedCtor() {
 }
 
 DlgCreateGame::DlgCreateGame(TabRoom *_room, const QMap<int, QString> &_gameTypes, QWidget *parent)
-        : QDialog(parent), room(_room), gameTypes(_gameTypes) {
+    : QDialog(parent), room(_room), gameTypes(_gameTypes)
+{
     sharedCtor();
 
     rememberGameSettings->setChecked(settingsCache->getRememberGameSettings());
@@ -139,7 +143,8 @@ DlgCreateGame::DlgCreateGame(TabRoom *_room, const QMap<int, QString> &_gameType
 }
 
 DlgCreateGame::DlgCreateGame(const ServerInfo_Game &gameInfo, const QMap<int, QString> &_gameTypes, QWidget *parent)
-        : QDialog(parent), room(0), gameTypes(_gameTypes) {
+    : QDialog(parent), room(0), gameTypes(_gameTypes)
+{
     sharedCtor();
 
     rememberGameSettings->setEnabled(false);
@@ -180,7 +185,8 @@ DlgCreateGame::DlgCreateGame(const ServerInfo_Game &gameInfo, const QMap<int, QS
     setWindowTitle(tr("Game information"));
 }
 
-void DlgCreateGame::actReset() {
+void DlgCreateGame::actReset()
+{
     descriptionEdit->setText("");
     maxPlayersEdit->setValue(2);
 
@@ -205,8 +211,8 @@ void DlgCreateGame::actReset() {
     descriptionEdit->setFocus();
 }
 
-
-void DlgCreateGame::actOK() {
+void DlgCreateGame::actOK()
+{
     Command_CreateGame cmd;
     cmd.set_description(descriptionEdit->text().simplified().toStdString());
     cmd.set_password(passwordEdit->text().toStdString());
@@ -247,7 +253,8 @@ void DlgCreateGame::actOK() {
     buttonBox->setEnabled(false);
 }
 
-void DlgCreateGame::checkResponse(const Response &response) {
+void DlgCreateGame::checkResponse(const Response &response)
+{
     buttonBox->setEnabled(true);
 
     if (response.response_code() == Response::RespOk)
@@ -258,9 +265,9 @@ void DlgCreateGame::checkResponse(const Response &response) {
     }
 }
 
-void DlgCreateGame::spectatorsAllowedChanged(int state) {
+void DlgCreateGame::spectatorsAllowedChanged(int state)
+{
     spectatorsNeedPasswordCheckBox->setEnabled(state);
     spectatorsCanTalkCheckBox->setEnabled(state);
     spectatorsSeeEverythingCheckBox->setEnabled(state);
 }
-

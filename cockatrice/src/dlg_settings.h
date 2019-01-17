@@ -1,8 +1,8 @@
 #ifndef DLG_SETTINGS_H
 #define DLG_SETTINGS_H
 
-#include <QComboBox>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDialog>
 #include <QGroupBox>
 #include <QLabel>
@@ -26,27 +26,27 @@ class QSpinBox;
 class QSlider;
 class QSpinBox;
 
-class AbstractSettingsPage : public QWidget {
+class AbstractSettingsPage : public QWidget
+{
 public:
     virtual void retranslateUi() = 0;
 };
 
-class GeneralSettingsPage : public AbstractSettingsPage {
+class GeneralSettingsPage : public AbstractSettingsPage
+{
     Q_OBJECT
 public:
     GeneralSettingsPage();
-    void retranslateUi();
+    void retranslateUi() override;
+
 private slots:
     void deckPathButtonClicked();
     void replaysPathButtonClicked();
     void picsPathButtonClicked();
-    void clearDownloadedPicsButtonClicked();
     void cardDatabasePathButtonClicked();
     void tokenDatabasePathButtonClicked();
     void languageBoxChanged(int index);
-    void setEnabledStatus(bool);
-    void defaultUrlRestoreButtonClicked();
-    void fallbackUrlRestoreButtonClicked();
+
 private:
     QStringList findQmFiles();
     QString languageName(const QString &qmFile);
@@ -55,14 +55,13 @@ private:
     QLineEdit *picsPathEdit;
     QLineEdit *cardDatabasePathEdit;
     QLineEdit *tokenDatabasePathEdit;
-    QLineEdit *defaultUrlEdit;
-    QLineEdit *fallbackUrlEdit;
     QSpinBox pixmapCacheEdit;
-    QGroupBox *personalGroupBox; 
+    QGroupBox *personalGroupBox;
     QGroupBox *pathsGroupBox;
     QComboBox languageBox;
-    QCheckBox picDownloadCheckBox;
     QCheckBox updateNotificationCheckBox;
+    QCheckBox newVersionOracleCheckBox;
+    QComboBox updateReleaseChannelBox;
     QLabel languageLabel;
     QLabel pixmapCacheLabel;
     QLabel deckPathLabel;
@@ -70,22 +69,21 @@ private:
     QLabel picsPathLabel;
     QLabel cardDatabasePathLabel;
     QLabel tokenDatabasePathLabel;
-    QLabel defaultUrlLabel;
-    QLabel fallbackUrlLabel;
-    QLabel urlLinkLabel;
-    QPushButton clearDownloadedPicsButton;
-    QPushButton defaultUrlRestoreButton;
-    QPushButton fallbackUrlRestoreButton;
+    QLabel updateReleaseChannelLabel;
+    QCheckBox showTipsOnStartup;
 };
 
-class AppearanceSettingsPage : public AbstractSettingsPage {
+class AppearanceSettingsPage : public AbstractSettingsPage
+{
     Q_OBJECT
 private slots:
     void themeBoxChanged(int index);
+
 private:
     QLabel themeLabel;
     QComboBox themeBox;
     QLabel minPlayersForMultiColumnLayoutLabel;
+    QLabel maxFontSizeForCardsLabel;
     QCheckBox displayCardNamesCheckBox;
     QCheckBox cardScalingCheckBox;
     QCheckBox horizontalHandCheckBox;
@@ -96,15 +94,19 @@ private:
     QGroupBox *handGroupBox;
     QGroupBox *tableGroupBox;
     QSpinBox minPlayersForMultiColumnLayoutEdit;
+    QSpinBox maxFontSizeForCardsEdit;
+
 public:
     AppearanceSettingsPage();
-    void retranslateUi();
+    void retranslateUi() override;
 };
 
-class UserInterfaceSettingsPage : public AbstractSettingsPage {
+class UserInterfaceSettingsPage : public AbstractSettingsPage
+{
     Q_OBJECT
 private slots:
     void setSpecNotificationEnabled(int);
+
 private:
     QCheckBox notificationsEnabledCheckBox;
     QCheckBox specNotificationsEnabledCheckBox;
@@ -114,41 +116,71 @@ private:
     QCheckBox tapAnimationCheckBox;
     QGroupBox *generalGroupBox;
     QGroupBox *animationGroupBox;
-    
+
 public:
     UserInterfaceSettingsPage();
-    void retranslateUi();
+    void retranslateUi() override;
 };
 
-class DeckEditorSettingsPage : public AbstractSettingsPage {
+class DeckEditorSettingsPage : public AbstractSettingsPage
+{
     Q_OBJECT
 public:
     DeckEditorSettingsPage();
-    void retranslateUi();
+    void retranslateUi() override;
+    QString getLastUpdateTime();
+
 private slots:
-    //void radioPriceTagSourceClicked(bool checked);
-signals:
-    //void priceTagSourceChanged(int _priceTagSource);
+    void storeSettings();
+    void urlListChanged(const QModelIndex &, int, int, const QModelIndex &, int);
+    void setSpoilersEnabled(bool);
+    void spoilerPathButtonClicked();
+    void updateSpoilers();
+    void unlockSettings();
+    void actAddURL();
+    void actRemoveURL();
+    void actEditURL();
+    void clearDownloadedPicsButtonClicked();
+    void resetDownloadedURLsButtonClicked();
+
 private:
-    //QCheckBox priceTagsCheckBox;
-    QGroupBox *generalGroupBox;
+    QPushButton clearDownloadedPicsButton;
+    QPushButton resetDownloadURLs;
+    QLabel urlLinkLabel;
+    QCheckBox picDownloadCheckBox;
+    QListWidget *urlList;
+    QCheckBox mcDownloadSpoilersCheckBox;
+    QLabel msDownloadSpoilersLabel;
+    QGroupBox *mpGeneralGroupBox;
+    QGroupBox *mpSpoilerGroupBox;
+    QLineEdit *mpSpoilerSavePathLineEdit;
+    QLabel mcSpoilerSaveLabel;
+    QLabel lastUpdatedLabel;
+    QLabel infoOnSpoilersLabel;
+    QPushButton *mpSpoilerPathButton;
+    QPushButton *updateNowButton;
 };
 
-class MessagesSettingsPage : public AbstractSettingsPage {
+class MessagesSettingsPage : public AbstractSettingsPage
+{
     Q_OBJECT
 public:
     MessagesSettingsPage();
-    void retranslateUi();
+    void retranslateUi() override;
+
 private slots:
     void actAdd();
+    void actEdit();
     void actRemove();
     void updateColor(const QString &value);
     void updateHighlightColor(const QString &value);
     void updateTextColor(int value);
     void updateTextHighlightColor(int value);
+
 private:
     QListWidget *messageList;
     QAction *aAdd;
+    QAction *aEdit;
     QAction *aRemove;
     QCheckBox chatMentionCheckBox;
     QCheckBox chatMentionCompleterCheckbox;
@@ -174,11 +206,13 @@ private:
     void updateHighlightPreview();
 };
 
-class SoundSettingsPage : public AbstractSettingsPage {
+class SoundSettingsPage : public AbstractSettingsPage
+{
     Q_OBJECT
 public:
     SoundSettingsPage();
-    void retranslateUi();
+    void retranslateUi() override;
+
 private:
     QLabel themeLabel;
     QComboBox themeBox;
@@ -188,29 +222,35 @@ private:
     QLabel masterVolumeLabel;
     QSlider *masterVolumeSlider;
     QSpinBox *masterVolumeSpinBox;
+
 private slots:
     void masterVolumeChanged(int value);
     void themeBoxChanged(int index);
 };
 
-class DlgSettings : public QDialog {
+class DlgSettings : public QDialog
+{
     Q_OBJECT
 public:
-    DlgSettings(QWidget *parent = 0);
+    explicit DlgSettings(QWidget *parent = nullptr);
     void setTab(int index);
+
 private slots:
     void changePage(QListWidgetItem *current, QListWidgetItem *previous);
     void updateLanguage();
+
 private:
     QListWidget *contentsWidget;
     QStackedWidget *pagesWidget;
-    QListWidgetItem *generalButton, *appearanceButton, *userInterfaceButton, *deckEditorButton, *messagesButton, *soundButton;
+    QListWidgetItem *generalButton, *appearanceButton, *userInterfaceButton, *deckEditorButton, *messagesButton,
+        *soundButton;
     QListWidgetItem *shortcutsButton;
     void createIcons();
     void retranslateUi();
+
 protected:
-    void changeEvent(QEvent *event);
-    void closeEvent(QCloseEvent *event);
+    void changeEvent(QEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 };
 
-#endif 
+#endif

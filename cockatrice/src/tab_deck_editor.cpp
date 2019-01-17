@@ -1,47 +1,48 @@
-#include <QLabel>
-#include <QToolButton>
-#include <QTreeView>
-#include <QHBoxLayout>
-#include <QVBoxLayout>
-#include <QToolBar>
-#include <QTextEdit>
-#include <QMenu>
+#include "tab_deck_editor.h"
+#include "abstractclient.h"
+#include "carddatabasemodel.h"
+#include "cardframe.h"
+#include "decklistmodel.h"
+#include "deckstats_interface.h"
+#include "dlg_load_deck_from_clipboard.h"
+#include "filterbuilder.h"
+#include "filtertreemodel.h"
+#include "main.h"
+#include "pb/command_deck_upload.pb.h"
+#include "pb/response.pb.h"
+#include "pending_command.h"
+#include "pictureloader.h"
+#include "settingscache.h"
+#include "tab_supervisor.h"
+#include "tappedout_interface.h"
 #include <QAction>
+#include <QApplication>
+#include <QClipboard>
 #include <QCloseEvent>
+#include <QDesktopServices>
+#include <QDir>
+#include <QDockWidget>
 #include <QFileDialog>
 #include <QGroupBox>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPrintPreviewDialog>
-#include <QHeaderView>
-#include <QApplication>
-#include <QClipboard>
-#include <QTextStream>
 #include <QProcessEnvironment>
-#include <QTimer>
-#include <QDockWidget>
 #include <QPushButton>
-#include <QDir>
-#include <QDesktopServices>
-#include "tab_deck_editor.h"
-#include "carddatabase.h"
-#include "pictureloader.h"
-#include "carddatabasemodel.h"
-#include "decklistmodel.h"
-#include "dlg_load_deck_from_clipboard.h"
-#include "main.h"
-#include "settingscache.h"
-#include "priceupdater.h"
-#include "tab_supervisor.h"
-#include "deckstats_interface.h"
-#include "tappedout_interface.h"
-#include "abstractclient.h"
-#include "pending_command.h"
-#include "pb/response.pb.h"
-#include "pb/command_deck_upload.pb.h"
-#include "filtertreemodel.h"
-#include "cardframe.h"
-#include "filterbuilder.h"
+#include <QSignalMapper>
+#include <QSplitter>
+#include <QTextEdit>
+#include <QTextStream>
+#include <QTimer>
+#include <QToolBar>
+#include <QToolButton>
+#include <QTreeView>
+#include <QUrl>
+#include <QVBoxLayout>
 
 void SearchLineEdit::keyPressEvent(QKeyEvent *event)
 {
@@ -63,14 +64,15 @@ void TabDeckEditor::createDeckDock()
     deckView->sortByColumn(1, Qt::AscendingOrder);
     deckView->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
     deckView->installEventFilter(&deckViewKeySignals);
-    connect(deckView->selectionModel(), SIGNAL(currentRowChanged(const QModelIndex &, const QModelIndex &)), this, SLOT(updateCardInfoRight(const QModelIndex &, const QModelIndex &)));
+    connect(deckView->selectionModel(), SIGNAL(currentRowChanged(const QModelIndex &, const QModelIndex &)), this,
+            SLOT(updateCardInfoRight(const QModelIndex &, const QModelIndex &)));
     connect(deckView, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(actSwapCard()));
-    connect(&deckViewKeySignals, SIGNAL(onS()), this, SLOT(actSwapCard()));
+    connect(&deckViewKeySignals, SIGNAL(onShiftS()), this, SLOT(actSwapCard()));
     connect(&deckViewKeySignals, SIGNAL(onEnter()), this, SLOT(actIncrement()));
     connect(&deckViewKeySignals, SIGNAL(onCtrlAltEqual()), this, SLOT(actIncrement()));
     connect(&deckViewKeySignals, SIGNAL(onCtrlAltMinus()), this, SLOT(actDecrement()));
-    connect(&deckViewKeySignals, SIGNAL(onRight()), this, SLOT(actIncrement()));
-    connect(&deckViewKeySignals, SIGNAL(onLeft()), this, SLOT(actDecrement()));
+    connect(&deckViewKeySignals, SIGNAL(onShiftRight()), this, SLOT(actIncrement()));
+    connect(&deckViewKeySignals, SIGNAL(onShiftLeft()), this, SLOT(actDecrement()));
     connect(&deckViewKeySignals, SIGNAL(onDelete()), this, SLOT(actRemoveCard()));
 
     nameLabel = new QLabel();
@@ -83,37 +85,57 @@ void TabDeckEditor::createDeckDock()
     commentsLabel->setObjectName("commentsLabel");
     commentsEdit = new QTextEdit;
     commentsEdit->setObjectName("commentsEdit");
-    commentsEdit->setMaximumHeight(70);
     commentsLabel->setBuddy(commentsEdit);
     connect(commentsEdit, SIGNAL(textChanged()), this, SLOT(updateComments()));
 
+    auto *upperLayout = new QGridLayout;
+    upperLayout->setObjectName("upperLayout");
+    upperLayout->addWidget(nameLabel, 0, 0);
+    upperLayout->addWidget(nameEdit, 0, 1);
+
+    upperLayout->addWidget(commentsLabel, 1, 0);
+    upperLayout->addWidget(commentsEdit, 1, 1);
+
     hashLabel1 = new QLabel();
     hashLabel1->setObjectName("hashLabel1");
+    auto *hashSizePolicy = new QSizePolicy();
+    hashSizePolicy->setHorizontalPolicy(QSizePolicy::Fixed);
+    hashLabel1->setSizePolicy(*hashSizePolicy);
     hashLabel = new QLabel;
     hashLabel->setObjectName("hashLabel");
 
-    QGridLayout *grid = new QGridLayout;
-    grid->setObjectName("grid");
-    grid->addWidget(nameLabel, 0, 0);
-    grid->addWidget(nameEdit, 0, 1);
+    auto *lowerLayout = new QGridLayout;
+    lowerLayout->setObjectName("lowerLayout");
+    lowerLayout->addWidget(hashLabel1, 0, 0);
+    lowerLayout->addWidget(hashLabel, 0, 1);
+    lowerLayout->addWidget(deckView, 1, 0, 1, 2);
 
-    grid->addWidget(commentsLabel, 1, 0);
-    grid->addWidget(commentsEdit, 1, 1);
+    // Create widgets for both layouts to make splitter work correctly
+    QWidget *topWidget = new QWidget;
+    topWidget->setLayout(upperLayout);
+    QWidget *bottomWidget = new QWidget;
+    bottomWidget->setLayout(lowerLayout);
 
-    grid->addWidget(hashLabel1, 2, 0);
-    grid->addWidget(hashLabel, 2, 1);
+    auto *split = new QSplitter;
+    split->setObjectName("deckSplitter");
+    split->setOrientation(Qt::Vertical);
+    split->setChildrenCollapsible(false);
+    split->addWidget(topWidget);
+    split->addWidget(bottomWidget);
+    split->setStretchFactor(0, 1);
+    split->setStretchFactor(1, 4);
 
-    QVBoxLayout *rightFrame = new QVBoxLayout;
+    auto *rightFrame = new QVBoxLayout;
     rightFrame->setObjectName("rightFrame");
-    rightFrame->addLayout(grid);
-    rightFrame->addWidget(deckView, 10);
+    rightFrame->addWidget(split);
 
     deckDock = new QDockWidget(this);
     deckDock->setObjectName("deckDock");
 
     deckDock->setMinimumSize(QSize(200, 41));
-    deckDock->setAllowedAreas(Qt::LeftDockWidgetArea|Qt::RightDockWidgetArea);
-    deckDock->setFeatures(QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable);
+    deckDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    deckDock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable |
+                          QDockWidget::DockWidgetMovable);
     QWidget *deckDockContents = new QWidget();
     deckDockContents->setObjectName("deckDockContents");
     deckDockContents->setLayout(rightFrame);
@@ -127,22 +149,23 @@ void TabDeckEditor::createCardInfoDock()
 {
     cardInfo = new CardFrame();
     cardInfo->setObjectName("cardInfo");
-    QVBoxLayout *cardInfoFrame = new QVBoxLayout;
+    auto *cardInfoFrame = new QVBoxLayout;
     cardInfoFrame->setObjectName("cardInfoFrame");
     cardInfoFrame->addWidget(cardInfo);
 
     cardInfoDock = new QDockWidget(this);
-    cardInfoDock->setObjectName("cardInfoDock");    
+    cardInfoDock->setObjectName("cardInfoDock");
 
     cardInfoDock->setMinimumSize(QSize(200, 41));
-    cardInfoDock->setAllowedAreas(Qt::LeftDockWidgetArea|Qt::RightDockWidgetArea);
-    cardInfoDock->setFeatures(QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable);
+    cardInfoDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    cardInfoDock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable |
+                              QDockWidget::DockWidgetMovable);
     QWidget *cardInfoDockContents = new QWidget();
     cardInfoDockContents->setObjectName("cardInfoDockContents");
     cardInfoDockContents->setLayout(cardInfoFrame);
     cardInfoDock->setWidget(cardInfoDockContents);
 
-    cardInfoDock->installEventFilter(this);    
+    cardInfoDock->installEventFilter(this);
     connect(cardInfoDock, SIGNAL(topLevelChanged(bool)), this, SLOT(dockTopLevelChanged(bool)));
 }
 
@@ -158,26 +181,29 @@ void TabDeckEditor::createFiltersDock()
     filterView->setUniformRowHeights(true);
     filterView->setHeaderHidden(true);
     filterView->setContextMenuPolicy(Qt::CustomContextMenu);
+    filterView->installEventFilter(&filterViewKeySignals);
     connect(filterModel, SIGNAL(layoutChanged()), filterView, SLOT(expandAll()));
-    connect(filterView, SIGNAL(customContextMenuRequested(const QPoint &)),this, SLOT(filterViewCustomContextMenu(const QPoint &)));
+    connect(filterView, SIGNAL(customContextMenuRequested(const QPoint &)), this,
+            SLOT(filterViewCustomContextMenu(const QPoint &)));
+    connect(&filterViewKeySignals, SIGNAL(onDelete()), this, SLOT(actClearFilterOne()));
 
-    FilterBuilder *filterBuilder = new FilterBuilder;
+    auto *filterBuilder = new FilterBuilder;
     filterBuilder->setObjectName("filterBuilder");
     connect(filterBuilder, SIGNAL(add(const CardFilter *)), filterModel, SLOT(addFilter(const CardFilter *)));
 
-    QToolButton *filterDelOne = new QToolButton();
+    auto *filterDelOne = new QToolButton();
     filterDelOne->setObjectName("filterDelOne");
     filterDelOne->setDefaultAction(aClearFilterOne);
     filterDelOne->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
-    QToolButton *filterDelAll = new QToolButton();
+    auto *filterDelAll = new QToolButton();
     filterDelAll->setObjectName("filterDelAll");
     filterDelAll->setDefaultAction(aClearFilterAll);
     filterDelAll->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
-    QGridLayout *filterLayout = new QGridLayout;
+    auto *filterLayout = new QGridLayout;
     filterLayout->setObjectName("filterLayout");
-    filterLayout->setContentsMargins(0,0,0,0);
+    filterLayout->setContentsMargins(0, 0, 0, 0);
     filterLayout->addWidget(filterBuilder, 0, 0, 1, 3);
     filterLayout->addWidget(filterView, 1, 0, 1, 3);
     filterLayout->addWidget(filterDelOne, 2, 0, 1, 1);
@@ -187,18 +213,19 @@ void TabDeckEditor::createFiltersDock()
     filterBox->setObjectName("filterBox");
     filterBox->setLayout(filterLayout);
 
-    QVBoxLayout *filterFrame = new QVBoxLayout;
+    auto *filterFrame = new QVBoxLayout;
     filterFrame->setObjectName("filterFrame");
     filterFrame->addWidget(filterBox);
 
     filterDock = new QDockWidget(this);
     filterDock->setObjectName("filterDock");
 
-    filterDock->setFeatures(QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable);
+    filterDock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable |
+                            QDockWidget::DockWidgetMovable);
     QWidget *filterDockContents = new QWidget(this);
     filterDockContents->setObjectName("filterDockContents");
     filterDockContents->setLayout(filterFrame);
-    filterDock->setWidget(filterDockContents);    
+    filterDock->setWidget(filterDockContents);
 
     filterDock->installEventFilter(this);
     connect(filterDock, SIGNAL(topLevelChanged(bool)), this, SLOT(dockTopLevelChanged(bool)));
@@ -224,8 +251,14 @@ void TabDeckEditor::createMenus()
     aSaveDeckToClipboard = new QAction(QString(), this);
     connect(aSaveDeckToClipboard, SIGNAL(triggered()), this, SLOT(actSaveDeckToClipboard()));
 
+    aSaveDeckToClipboardRaw = new QAction(QString(), this);
+    connect(aSaveDeckToClipboardRaw, SIGNAL(triggered()), this, SLOT(actSaveDeckToClipboardRaw()));
+
     aPrintDeck = new QAction(QString(), this);
     connect(aPrintDeck, SIGNAL(triggered()), this, SLOT(actPrintDeck()));
+
+    aExportDeckDecklist = new QAction(QString(), this);
+    connect(aExportDeckDecklist, SIGNAL(triggered()), this, SLOT(actExportDeckDecklist()));
 
     aAnalyzeDeckDeckstats = new QAction(QString(), this);
     connect(aAnalyzeDeckDeckstats, SIGNAL(triggered()), this, SLOT(actAnalyzeDeckDeckstats()));
@@ -234,6 +267,7 @@ void TabDeckEditor::createMenus()
     connect(aAnalyzeDeckTappedout, SIGNAL(triggered()), this, SLOT(actAnalyzeDeckTappedout()));
 
     analyzeDeckMenu = new QMenu(this);
+    analyzeDeckMenu->addAction(aExportDeckDecklist);
     analyzeDeckMenu->addAction(aAnalyzeDeckDeckstats);
     analyzeDeckMenu->addAction(aAnalyzeDeckTappedout);
 
@@ -248,6 +282,10 @@ void TabDeckEditor::createMenus()
     aClearFilterOne->setIcon(QPixmap("theme:icons/decrement"));
     connect(aClearFilterOne, SIGNAL(triggered()), this, SLOT(actClearFilterOne()));
 
+    saveDeckToClipboardMenu = new QMenu(this);
+    saveDeckToClipboardMenu->addAction(aSaveDeckToClipboard);
+    saveDeckToClipboardMenu->addAction(aSaveDeckToClipboardRaw);
+
     deckMenu = new QMenu(this);
     deckMenu->addAction(aNewDeck);
     deckMenu->addAction(aLoadDeck);
@@ -255,7 +293,7 @@ void TabDeckEditor::createMenus()
     deckMenu->addAction(aSaveDeckAs);
     deckMenu->addSeparator();
     deckMenu->addAction(aLoadDeckFromClipboard);
-    deckMenu->addAction(aSaveDeckToClipboard);
+    deckMenu->addMenu(saveDeckToClipboardMenu);
     deckMenu->addSeparator();
     deckMenu->addAction(aPrintDeck);
     deckMenu->addMenu(analyzeDeckMenu);
@@ -274,30 +312,32 @@ void TabDeckEditor::createMenus()
 
     aCardInfoDockVisible = cardInfoDockMenu->addAction(QString());
     aCardInfoDockVisible->setCheckable(true);
-    connect(aCardInfoDockVisible,SIGNAL(triggered()),this,SLOT(dockVisibleTriggered()));
+    connect(aCardInfoDockVisible, SIGNAL(triggered()), this, SLOT(dockVisibleTriggered()));
     aCardInfoDockFloating = cardInfoDockMenu->addAction(QString());
     aCardInfoDockFloating->setCheckable(true);
-    connect(aCardInfoDockFloating,SIGNAL(triggered()),this,SLOT(dockFloatingTriggered()));
+    connect(aCardInfoDockFloating, SIGNAL(triggered()), this, SLOT(dockFloatingTriggered()));
 
     aDeckDockVisible = deckDockMenu->addAction(QString());
     aDeckDockVisible->setCheckable(true);
-    connect(aDeckDockVisible,SIGNAL(triggered()),this,SLOT(dockVisibleTriggered()));
+    connect(aDeckDockVisible, SIGNAL(triggered()), this, SLOT(dockVisibleTriggered()));
     aDeckDockFloating = deckDockMenu->addAction(QString());
     aDeckDockFloating->setCheckable(true);
-    connect(aDeckDockFloating,SIGNAL(triggered()),this,SLOT(dockFloatingTriggered()));
+    connect(aDeckDockFloating, SIGNAL(triggered()), this, SLOT(dockFloatingTriggered()));
 
     aFilterDockVisible = filterDockMenu->addAction(QString());
     aFilterDockVisible->setCheckable(true);
-    connect(aFilterDockVisible,SIGNAL(triggered()),this,SLOT(dockVisibleTriggered()));
+    connect(aFilterDockVisible, SIGNAL(triggered()), this, SLOT(dockVisibleTriggered()));
     aFilterDockFloating = filterDockMenu->addAction(QString());
     aFilterDockFloating->setCheckable(true);
-    connect(aFilterDockFloating,SIGNAL(triggered()),this,SLOT(dockFloatingTriggered()));
+    connect(aFilterDockFloating, SIGNAL(triggered()), this, SLOT(dockFloatingTriggered()));
 
     viewMenu->addSeparator();
 
     aResetLayout = viewMenu->addAction(QString());
-    connect(aResetLayout,SIGNAL(triggered()),this,SLOT(restartLayout()));
+    connect(aResetLayout, SIGNAL(triggered()), this, SLOT(restartLayout()));
     viewMenu->addAction(aResetLayout);
+
+    setSaveStatus(false);
 
     addTabMenu(viewMenu);
 }
@@ -306,14 +346,14 @@ void TabDeckEditor::createCentralFrame()
 {
     searchEdit = new SearchLineEdit;
     searchEdit->setObjectName("searchEdit");
-#if QT_VERSION >= 0x050300
+    searchEdit->setPlaceholderText(tr("Search by card name"));
+    searchEdit->setClearButtonEnabled(true);
     searchEdit->addAction(QPixmap("theme:icons/search"), QLineEdit::LeadingPosition);
-#endif
+    searchEdit->installEventFilter(&searchKeySignals);
 
     setFocusProxy(searchEdit);
     setFocusPolicy(Qt::ClickFocus);
 
-    searchEdit->installEventFilter(&searchKeySignals);
     searchKeySignals.setObjectName("searchKeySignals");
     connect(searchEdit, SIGNAL(textChanged(const QString &)), this, SLOT(updateSearch(const QString &)));
     connect(&searchKeySignals, SIGNAL(onEnter()), this, SLOT(actAddCard()));
@@ -322,9 +362,9 @@ void TabDeckEditor::createCentralFrame()
     connect(&searchKeySignals, SIGNAL(onCtrlAltMinus()), this, SLOT(actDecrementCard()));
     connect(&searchKeySignals, SIGNAL(onCtrlAltLBracket()), this, SLOT(actDecrementCardFromSideboard()));
     connect(&searchKeySignals, SIGNAL(onCtrlAltEnter()), this, SLOT(actAddCardToSideboard()));
-    connect(&searchKeySignals, SIGNAL(onCtrlEnter()), this, SLOT(actAddCardToSideboard()));    
+    connect(&searchKeySignals, SIGNAL(onCtrlEnter()), this, SLOT(actAddCardToSideboard()));
 
-    databaseModel = new CardDatabaseModel(db, this);
+    databaseModel = new CardDatabaseModel(db, true, this);
     databaseModel->setObjectName("databaseModel");
     databaseDisplayModel = new CardDatabaseDisplayModel(this);
     databaseDisplayModel->setSourceModel(databaseModel);
@@ -339,12 +379,14 @@ void TabDeckEditor::createCentralFrame()
     databaseView->setSortingEnabled(true);
     databaseView->sortByColumn(0, Qt::AscendingOrder);
     databaseView->setModel(databaseDisplayModel);
-    connect(databaseView->selectionModel(), SIGNAL(currentRowChanged(const QModelIndex &, const QModelIndex &)), this, SLOT(updateCardInfoLeft(const QModelIndex &, const QModelIndex &)));
+    databaseView->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(databaseView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(databaseCustomMenu(QPoint)));
+    connect(databaseView->selectionModel(), SIGNAL(currentRowChanged(const QModelIndex &, const QModelIndex &)), this,
+            SLOT(updateCardInfoLeft(const QModelIndex &, const QModelIndex &)));
     connect(databaseView, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(actAddCard()));
 
     QByteArray dbHeaderState = settingsCache->layouts().getDeckEditorDbHeaderState();
-    if(dbHeaderState.isNull())
-    {
+    if (dbHeaderState.isNull()) {
         // first run
         databaseView->setColumnWidth(0, 200);
     } else {
@@ -370,7 +412,7 @@ void TabDeckEditor::createCentralFrame()
     aDecrement->setIcon(QPixmap("theme:icons/decrement"));
     connect(aDecrement, SIGNAL(triggered()), this, SLOT(actDecrement()));
 
-    QToolBar *deckEditToolBar = new QToolBar;
+    auto *deckEditToolBar = new QToolBar;
     deckEditToolBar->setObjectName("deckEditToolBar");
     deckEditToolBar->setOrientation(Qt::Horizontal);
     deckEditToolBar->setIconSize(QSize(24, 24));
@@ -396,7 +438,37 @@ void TabDeckEditor::createCentralFrame()
     centralWidget->setObjectName("centralWidget");
     centralWidget->setLayout(centralFrame);
     setCentralWidget(centralWidget);
-    setDockOptions(QMainWindow::AnimatedDocks|QMainWindow::AllowNestedDocks|QMainWindow::AllowTabbedDocks);
+    setDockOptions(QMainWindow::AnimatedDocks | QMainWindow::AllowNestedDocks | QMainWindow::AllowTabbedDocks);
+}
+
+void TabDeckEditor::databaseCustomMenu(QPoint point)
+{
+    QMenu menu;
+    const CardInfoPtr info = currentCardInfo();
+
+    // add to deck and sideboard options
+    QAction *addToDeck, *addToSideboard;
+    addToDeck = menu.addAction(tr("Add to Deck"));
+    addToSideboard = menu.addAction(tr("Add to Sideboard"));
+    connect(addToDeck, SIGNAL(triggered()), this, SLOT(actAddCard()));
+    connect(addToSideboard, SIGNAL(triggered()), this, SLOT(actAddCardToSideboard()));
+
+    // filling out the related cards submenu
+    auto *relatedMenu = new QMenu(tr("Show Related cards"));
+    menu.addMenu(relatedMenu);
+    if (info->getRelatedCards().isEmpty()) {
+        relatedMenu->setDisabled(true);
+    } else {
+        auto *signalMapper = new QSignalMapper(this);
+        for (const CardRelation *rel : info->getRelatedCards()) {
+            QAction *relatedCard;
+            relatedCard = relatedMenu->addAction(rel->getName());
+            connect(relatedCard, SIGNAL(triggered()), signalMapper, SLOT(map()));
+            signalMapper->setMapping(relatedCard, rel->getName());
+        }
+        connect(signalMapper, SIGNAL(mapped(const QString &)), cardInfo, SLOT(setCard(const QString &)));
+    }
+    menu.exec(databaseView->mapToGlobal(point));
 }
 
 void TabDeckEditor::restartLayout()
@@ -440,8 +512,8 @@ void TabDeckEditor::freeDocksSize()
     cardInfoDock->setMinimumSize(100, 100);
     cardInfoDock->setMaximumSize(5000, 5000);
 
-    filterDock->setMinimumSize(100,100);
-    filterDock->setMaximumSize(5000,5000);
+    filterDock->setMinimumSize(100, 100);
+    filterDock->setMaximumSize(5000, 5000);
 }
 
 void TabDeckEditor::refreshShortcuts()
@@ -449,15 +521,21 @@ void TabDeckEditor::refreshShortcuts()
     aNewDeck->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aNewDeck"));
     aLoadDeck->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aLoadDeck"));
     aSaveDeck->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aSaveDeck"));
+    aExportDeckDecklist->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aExportDeckDecklist"));
     aSaveDeckAs->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aSaveDeckAs"));
-    aLoadDeckFromClipboard->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aLoadDeckFromClipboard"));
+    aLoadDeckFromClipboard->setShortcuts(
+        settingsCache->shortcuts().getShortcut("TabDeckEditor/aLoadDeckFromClipboard"));
     aPrintDeck->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aPrintDeck"));
     aAnalyzeDeckDeckstats->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aAnalyzeDeck"));
     aClose->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aClose"));
     aResetLayout->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aResetLayout"));
     aClearFilterAll->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aClearFilterAll"));
     aClearFilterOne->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aClearFilterOne"));
+
     aSaveDeckToClipboard->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aSaveDeckToClipboard"));
+    aSaveDeckToClipboardRaw->setShortcuts(
+        settingsCache->shortcuts().getShortcut("TabDeckEditor/aSaveDeckToClipboardRaw"));
+
     aClearFilterOne->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aClearFilterOne"));
     aClose->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aClose"));
     aRemoveCard->setShortcuts(settingsCache->shortcuts().getShortcut("TabDeckEditor/aRemoveCard"));
@@ -509,10 +587,10 @@ TabDeckEditor::TabDeckEditor(TabSupervisor *_tabSupervisor, QWidget *parent)
 
     restartLayout();
 
-    this->installEventFilter(this);    
+    this->installEventFilter(this);
 
     retranslateUi();
-    connect(&settingsCache->shortcuts(), SIGNAL(shortCutchanged()),this,SLOT(refreshShortcuts()));
+    connect(&settingsCache->shortcuts(), SIGNAL(shortCutChanged()), this, SLOT(refreshShortcuts()));
     refreshShortcuts();
 
     QTimer::singleShot(0, this, SLOT(loadLayout()));
@@ -529,28 +607,30 @@ void TabDeckEditor::retranslateUi()
 
     aClearFilterAll->setText(tr("&Clear all filters"));
     aClearFilterOne->setText(tr("Delete selected"));
-    
+
     nameLabel->setText(tr("Deck &name:"));
     commentsLabel->setText(tr("&Comments:"));
     hashLabel1->setText(tr("Hash:"));
-    
-    //aUpdatePrices->setText(tr("&Update prices"));
-    //aUpdatePrices->setShortcut(QKeySequence("Ctrl+U"));
 
     aNewDeck->setText(tr("&New deck"));
     aLoadDeck->setText(tr("&Load deck..."));
     aSaveDeck->setText(tr("&Save deck"));
     aSaveDeckAs->setText(tr("Save deck &as..."));
     aLoadDeckFromClipboard->setText(tr("Load deck from cl&ipboard..."));
-    aSaveDeckToClipboard->setText(tr("Save deck to clip&board"));
+
+    saveDeckToClipboardMenu->setTitle(tr("Save deck to clipboard"));
+    aSaveDeckToClipboard->setText(tr("Annotated"));
+    aSaveDeckToClipboardRaw->setText(tr("Not Annotated"));
+
     aPrintDeck->setText(tr("&Print deck..."));
 
-    analyzeDeckMenu->setTitle(tr("&Analyze deck online"));
-    aAnalyzeDeckDeckstats->setText(tr("deckstats.net"));
-    aAnalyzeDeckTappedout->setText(tr("tappedout.net"));
+    analyzeDeckMenu->setTitle(tr("&Send deck to online service"));
+    aExportDeckDecklist->setText(tr("Create decklist (decklist.org)"));
+    aAnalyzeDeckDeckstats->setText(tr("Analyze deck (deckstats.net)"));
+    aAnalyzeDeckTappedout->setText(tr("Analyze deck (tappedout.net)"));
 
     aClose->setText(tr("&Close"));
-    
+
     aAddCard->setText(tr("Add card to &maindeck"));
     aAddCardToSideboard->setText(tr("Add card to &sideboard"));
 
@@ -559,7 +639,7 @@ void TabDeckEditor::retranslateUi()
     aIncrement->setText(tr("&Increment number"));
 
     aDecrement->setText(tr("&Decrement number"));
-    
+
     deckMenu->setTitle(tr("&Deck Editor"));
 
     cardInfoDock->setWindowTitle(tr("Card Info"));
@@ -595,20 +675,22 @@ void TabDeckEditor::updateName(const QString &name)
 {
     deckModel->getDeckList()->setName(name);
     setModified(true);
+    setSaveStatus(true);
 }
 
 void TabDeckEditor::updateComments()
 {
     deckModel->getDeckList()->setComments(commentsEdit->toPlainText());
     setModified(true);
+    setSaveStatus(true);
 }
 
-void TabDeckEditor::updateCardInfoLeft(const QModelIndex &current, const QModelIndex &/*previous*/)
+void TabDeckEditor::updateCardInfoLeft(const QModelIndex &current, const QModelIndex & /*previous*/)
 {
     cardInfo->setCard(current.sibling(current.row(), 0).data().toString());
 }
 
-void TabDeckEditor::updateCardInfoRight(const QModelIndex &current, const QModelIndex &/*previous*/)
+void TabDeckEditor::updateCardInfoRight(const QModelIndex &current, const QModelIndex & /*previous*/)
 {
     if (!current.isValid())
         return;
@@ -621,7 +703,8 @@ void TabDeckEditor::updateSearch(const QString &search)
     databaseDisplayModel->setCardName(search);
     QModelIndexList sel = databaseView->selectionModel()->selectedRows();
     if (sel.isEmpty() && databaseDisplayModel->rowCount())
-        databaseView->selectionModel()->setCurrentIndex(databaseDisplayModel->index(0, 0), QItemSelectionModel::SelectCurrent | QItemSelectionModel::Rows);
+        databaseView->selectionModel()->setCurrentIndex(databaseDisplayModel->index(0, 0),
+                                                        QItemSelectionModel::SelectCurrent | QItemSelectionModel::Rows);
 }
 
 void TabDeckEditor::updateHash()
@@ -633,8 +716,8 @@ bool TabDeckEditor::confirmClose()
 {
     if (modified) {
         tabSupervisor->setCurrentWidget(this);
-        QMessageBox::StandardButton ret = QMessageBox::warning(this, tr("Are you sure?"),
-            tr("The decklist has been modified.\nDo you want to save the changes?"),
+        QMessageBox::StandardButton ret = QMessageBox::warning(
+            this, tr("Are you sure?"), tr("The decklist has been modified.\nDo you want to save the changes?"),
             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
         if (ret == QMessageBox::Save)
             return actSaveDeck();
@@ -660,6 +743,7 @@ void TabDeckEditor::actNewDeck()
     commentsEdit->setText(QString());
     hashLabel->setText(QString());
     setModified(false);
+    setSaveStatus(false);
 }
 
 void TabDeckEditor::actLoadDeck()
@@ -672,12 +756,14 @@ void TabDeckEditor::actLoadDeck()
 
     QString fileName = dialog.selectedFiles().at(0);
     DeckLoader::FileFormat fmt = DeckLoader::getFormatFromName(fileName);
-    
-    DeckLoader *l = new DeckLoader;
-    if (l->loadFromFile(fileName, fmt))
+
+    auto *l = new DeckLoader;
+    if (l->loadFromFile(fileName, fmt)) {
+        setSaveStatus(false);
         setDeck(l);
-    else
+    } else
         delete l;
+    setSaveStatus(true);
 }
 
 void TabDeckEditor::saveDeckRemoteFinished(const Response &response)
@@ -693,13 +779,14 @@ bool TabDeckEditor::actSaveDeck()
     DeckLoader *const deck = deckModel->getDeckList();
     if (deck->getLastRemoteDeckId() != -1) {
         Command_DeckUpload cmd;
-        cmd.set_deck_id(deck->getLastRemoteDeckId());
+        cmd.set_deck_id(static_cast<google::protobuf::uint32>(deck->getLastRemoteDeckId()));
         cmd.set_deck_list(deck->writeToString_Native().toStdString());
-        
+
         PendingCommand *pend = AbstractClient::prepareSessionCommand(cmd);
-        connect(pend, SIGNAL(finished(Response, CommandContainer, QVariant)), this, SLOT(saveDeckRemoteFinished(Response)));
+        connect(pend, SIGNAL(finished(Response, CommandContainer, QVariant)), this,
+                SLOT(saveDeckRemoteFinished(Response)));
         tabSupervisor->getClient()->sendCommand(pend);
-        
+
         return true;
     } else if (deck->getLastFileName().isEmpty())
         return actSaveDeckAs();
@@ -707,7 +794,9 @@ bool TabDeckEditor::actSaveDeck()
         setModified(false);
         return true;
     }
-    QMessageBox::critical(this, tr("Error"), tr("The deck could not be saved.\nPlease check that the directory is writable and try again."));
+    QMessageBox::critical(
+        this, tr("Error"),
+        tr("The deck could not be saved.\nPlease check that the directory is writable and try again."));
     return false;
 }
 
@@ -719,7 +808,7 @@ bool TabDeckEditor::actSaveDeckAs()
     dialog.setConfirmOverwrite(true);
     dialog.setDefaultSuffix("cod");
     dialog.setNameFilters(DeckLoader::fileNameFilters);
-    dialog.selectFile(deckModel->getDeckList()->getName());
+    dialog.selectFile(deckModel->getDeckList()->getName().trimmed() + ".cod");
     if (!dialog.exec())
         return false;
 
@@ -727,7 +816,9 @@ bool TabDeckEditor::actSaveDeckAs()
     DeckLoader::FileFormat fmt = DeckLoader::getFormatFromName(fileName);
 
     if (!deckModel->getDeckList()->saveToFile(fileName, fmt)) {
-        QMessageBox::critical(this, tr("Error"), tr("The deck could not be saved.\nPlease check that the directory is writable and try again."));
+        QMessageBox::critical(
+            this, tr("Error"),
+            tr("The deck could not be saved.\nPlease check that the directory is writable and try again."));
         return false;
     }
     setModified(false);
@@ -738,13 +829,14 @@ void TabDeckEditor::actLoadDeckFromClipboard()
 {
     if (!confirmClose())
         return;
-    
+
     DlgLoadDeckFromClipboard dlg;
     if (!dlg.exec())
         return;
-    
+
     setDeck(dlg.getDeckList());
     setModified(true);
+    setSaveStatus(true);
 }
 
 void TabDeckEditor::actSaveDeckToClipboard()
@@ -756,6 +848,15 @@ void TabDeckEditor::actSaveDeckToClipboard()
     QApplication::clipboard()->setText(buffer, QClipboard::Selection);
 }
 
+void TabDeckEditor::actSaveDeckToClipboardRaw()
+{
+    QString buffer;
+    QTextStream stream(&buffer);
+    deckModel->getDeckList()->saveToStream_Plain(stream, false);
+    QApplication::clipboard()->setText(buffer, QClipboard::Clipboard);
+    QApplication::clipboard()->setText(buffer, QClipboard::Selection);
+}
+
 void TabDeckEditor::actPrintDeck()
 {
     QPrintPreviewDialog *dlg = new QPrintPreviewDialog(this);
@@ -763,33 +864,60 @@ void TabDeckEditor::actPrintDeck()
     dlg->exec();
 }
 
+// Action called when export deck to decklist menu item is pressed.
+void TabDeckEditor::actExportDeckDecklist()
+{
+    // Get the decklist class for the deck.
+    DeckLoader *const deck = deckModel->getDeckList();
+    // create a string to load the decklist url into.
+    QString decklistUrlString;
+    // check if deck is not null
+    if (deck) {
+        // Get the decklist url string from the deck loader class.
+        decklistUrlString = deck->exportDeckToDecklist();
+        // Check to make sure the string isn't empty.
+        if (QString::compare(decklistUrlString, "", Qt::CaseInsensitive) == 0) {
+            // Show an error if the deck is empty, and return.
+            QMessageBox::critical(this, tr("Error"), tr("There are no cards in your deck to be exported"));
+            return;
+        }
+        // Encode the string recieved from the model to make sure all characters are encoded.
+        // first we put it into a qurl object
+        QUrl decklistUrl = QUrl(decklistUrlString);
+        // we get the correctly encoded url.
+        decklistUrlString = decklistUrl.toEncoded();
+        // We open the url in the user's default browser
+        QDesktopServices::openUrl(decklistUrlString);
+    } else {
+        // if there's no deck loader object, return an error
+        QMessageBox::critical(this, tr("Error"), tr("No deck was selected to be saved."));
+    }
+}
+
 void TabDeckEditor::actAnalyzeDeckDeckstats()
 {
-    DeckStatsInterface *interface = new DeckStatsInterface(
-        *databaseModel->getDatabase(),
-        this
-    ); // it deletes itself when done
+    auto *interface = new DeckStatsInterface(*databaseModel->getDatabase(),
+                                             this); // it deletes itself when done
     interface->analyzeDeck(deckModel->getDeckList());
 }
 
 void TabDeckEditor::actAnalyzeDeckTappedout()
 {
-    TappedOutInterface *interface = new TappedOutInterface(
-        *databaseModel->getDatabase(),
-        this
-    ); // it deletes itself when done
+    auto *interface = new TappedOutInterface(*databaseModel->getDatabase(),
+                                             this); // it deletes itself when done
     interface->analyzeDeck(deckModel->getDeckList());
 }
 
 void TabDeckEditor::actClearFilterAll()
 {
     databaseDisplayModel->clearFilterAll();
+    searchEdit->setText("");
 }
 
 void TabDeckEditor::actClearFilterOne()
 {
     QModelIndexList selIndexes = filterView->selectionModel()->selectedIndexes();
-    foreach(QModelIndex idx, selIndexes)
+    foreach (QModelIndex idx, selIndexes)
         filterModel->removeRow(idx.row(), idx.parent());
 }
 
@@ -800,25 +928,25 @@ void TabDeckEditor::recursiveExpand(const QModelIndex &index)
     deckView->expand(index);
 }
 
-CardInfo *TabDeckEditor::currentCardInfo() const
+CardInfoPtr TabDeckEditor::currentCardInfo() const
 {
     const QModelIndex currentIndex = databaseView->selectionModel()->currentIndex();
-    if (!currentIndex.isValid())
-        return NULL;
+    if (!currentIndex.isValid()) {
+        return {};
+    }
+
     const QString cardName = currentIndex.sibling(currentIndex.row(), 0).data().toString();
-    
+
     return db->getCard(cardName);
 }
 
 void TabDeckEditor::addCardHelper(QString zoneName)
 {
-    const CardInfo *info;
-
-    info = currentCardInfo();
-    if(!info)
+    const CardInfoPtr info = currentCardInfo();
+    if (!info)
         return;
     if (info->getIsToken())
-        zoneName = "tokens";
+        zoneName = DECK_ZONE_TOKENS;
 
     QModelIndex newCardIndex = deckModel->addCard(info->getName(), zoneName);
     recursiveExpand(newCardIndex);
@@ -834,31 +962,35 @@ void TabDeckEditor::actSwapCard()
         return;
     const QString cardName = currentIndex.sibling(currentIndex.row(), 1).data().toString();
     const QModelIndex gparent = currentIndex.parent().parent();
+
     if (!gparent.isValid())
-            return;
+        return;
 
-    const QString zoneName = gparent.sibling(gparent.row(), 1).data().toString();
+    const QString zoneName = gparent.sibling(gparent.row(), 1).data(Qt::EditRole).toString();
     actDecrement();
+    const QString otherZoneName = zoneName == DECK_ZONE_MAIN ? DECK_ZONE_SIDE : DECK_ZONE_MAIN;
 
-    const QString otherZoneName = zoneName == "Maindeck" ? "side" : "main";
-
-    QModelIndex newCardIndex = deckModel->addCard(cardName, otherZoneName);
+    // Third argument (true) says create the card no mater what, even if not in DB
+    QModelIndex newCardIndex = deckModel->addCard(cardName, otherZoneName, true);
     recursiveExpand(newCardIndex);
 
     setModified(true);
+    setSaveStatus(true);
 }
 
 void TabDeckEditor::actAddCard()
 {
-    if(QApplication::keyboardModifiers() & Qt::ControlModifier)
+    if (QApplication::keyboardModifiers() & Qt::ControlModifier)
         actAddCardToSideboard();
     else
-        addCardHelper("main");
+        addCardHelper(DECK_ZONE_MAIN);
+    setSaveStatus(true);
 }
 
 void TabDeckEditor::actAddCardToSideboard()
 {
-    addCardHelper("side");
+    addCardHelper(DECK_ZONE_SIDE);
+    setSaveStatus(true);
 }
 
 void TabDeckEditor::actRemoveCard()
@@ -867,6 +999,9 @@ void TabDeckEditor::actRemoveCard()
     if (!currentIndex.isValid() || deckModel->hasChildren(currentIndex))
         return;
     deckModel->removeRow(currentIndex.row(), currentIndex.parent());
+
+    DeckLoader *const deck = deckModel->getDeckList();
+    setSaveStatus(!deck->isEmpty());
     setModified(true);
 }
 
@@ -888,14 +1023,13 @@ void TabDeckEditor::offsetCountAtIndex(const QModelIndex &idx, int offset)
 
 void TabDeckEditor::decrementCardHelper(QString zoneName)
 {
-    const CardInfo *info;
+    const CardInfoPtr info = currentCardInfo();
     QModelIndex idx;
 
-    info = currentCardInfo();
-    if(!info)
+    if (!info)
         return;
     if (info->getIsToken())
-        zoneName = "tokens";
+        zoneName = DECK_ZONE_TOKENS;
 
     idx = deckModel->findCard(info->getName(), zoneName);
     offsetCountAtIndex(idx, -1);
@@ -903,12 +1037,12 @@ void TabDeckEditor::decrementCardHelper(QString zoneName)
 
 void TabDeckEditor::actDecrementCard()
 {
-    decrementCardHelper("main");
+    decrementCardHelper(DECK_ZONE_MAIN);
 }
 
 void TabDeckEditor::actDecrementCardFromSideboard()
 {
-    decrementCardHelper("side");
+    decrementCardHelper(DECK_ZONE_SIDE);
 }
 
 void TabDeckEditor::actIncrement()
@@ -921,39 +1055,6 @@ void TabDeckEditor::actDecrement()
 {
     const QModelIndex &currentIndex = deckView->selectionModel()->currentIndex();
     offsetCountAtIndex(currentIndex, -1);
-}
-
-void TabDeckEditor::setPriceTagFeatureEnabled(int /* enabled */)
-{
-    //aUpdatePrices->setVisible(enabled);
-    deckModel->pricesUpdated();
-}
-
-/*
-void TabDeckEditor::actUpdatePrices()
-{
-    aUpdatePrices->setDisabled(true);
-    AbstractPriceUpdater *up;
-
-    switch(settingsCache->getPriceTagSource())
-    {
-        case AbstractPriceUpdater::DBPriceSource:
-        default:
-            up = new DBPriceUpdater(deckModel->getDeckList());
-            break;
-    }
-     
-    connect(up, SIGNAL(finishedUpdate()), this, SLOT(finishedUpdatingPrices()));
-    up->updatePrices();
-}
-*/
-
-
-void TabDeckEditor::finishedUpdatingPrices()
-{
-    //deckModel->pricesUpdated();
-    //setModified(true);
-    //aUpdatePrices->setDisabled(false);
 }
 
 void TabDeckEditor::setDeck(DeckLoader *_deck)
@@ -970,6 +1071,10 @@ void TabDeckEditor::setDeck(DeckLoader *_deck)
     PictureLoader::cacheCardPixmaps(db->getCards(deckModel->getDeckList()->getCardList()));
     deckView->expandAll();
     setModified(false);
+
+    // If they load a deck, make the deck list appear
+    aDeckDockVisible->setChecked(true);
+    deckDock->setVisible(aDeckDockVisible->isChecked());
 }
 
 void TabDeckEditor::setModified(bool _modified)
@@ -978,7 +1083,8 @@ void TabDeckEditor::setModified(bool _modified)
     emit tabTextChanged(this, getTabText());
 }
 
-void TabDeckEditor::filterViewCustomContextMenu(const QPoint &point) {
+void TabDeckEditor::filterViewCustomContextMenu(const QPoint &point)
+{
     QMenu menu;
     QAction *action;
     QModelIndex idx;
@@ -989,12 +1095,12 @@ void TabDeckEditor::filterViewCustomContextMenu(const QPoint &point) {
 
     action = menu.addAction(QString("delete"));
     action->setData(point);
-    connect(&menu, SIGNAL(triggered(QAction *)),
-            this, SLOT(filterRemove(QAction *)));
+    connect(&menu, SIGNAL(triggered(QAction *)), this, SLOT(filterRemove(QAction *)));
     menu.exec(filterView->mapToGlobal(point));
 }
 
-void TabDeckEditor::filterRemove(QAction *action) {
+void TabDeckEditor::filterRemove(QAction *action)
+{
     QPoint point;
     QModelIndex idx;
 
@@ -1007,23 +1113,21 @@ void TabDeckEditor::filterRemove(QAction *action) {
 }
 
 // Method uses to sync docks state with menu items state
-bool TabDeckEditor::eventFilter(QObject * o, QEvent * e)
+bool TabDeckEditor::eventFilter(QObject *o, QEvent *e)
 {
-    if(e->type() == QEvent::Close)
-    {
-        if(o == cardInfoDock)
-        {
+    if (e->type() == QEvent::Close) {
+        if (o == cardInfoDock) {
             aCardInfoDockVisible->setChecked(false);
             aCardInfoDockFloating->setEnabled(false);
-        } else if(o == deckDock) {
+        } else if (o == deckDock) {
             aDeckDockVisible->setChecked(false);
             aDeckDockFloating->setEnabled(false);
-        } else if(o == filterDock) {
+        } else if (o == filterDock) {
             aFilterDockVisible->setChecked(false);
             aFilterDockFloating->setEnabled(false);
         }
-    }   
-    if( o == this && e->type() == QEvent::Hide){
+    }
+    if (o == this && e->type() == QEvent::Hide) {
         settingsCache->layouts().setDeckEditorLayoutState(saveState());
         settingsCache->layouts().setDeckEditorGeometry(saveGeometry());
         settingsCache->layouts().setDeckEditorCardSize(cardInfoDock->size());
@@ -1036,22 +1140,19 @@ bool TabDeckEditor::eventFilter(QObject * o, QEvent * e)
 void TabDeckEditor::dockVisibleTriggered()
 {
     QObject *o = sender();
-    if(o == aCardInfoDockVisible)
-    {
+    if (o == aCardInfoDockVisible) {
         cardInfoDock->setVisible(aCardInfoDockVisible->isChecked());
         aCardInfoDockFloating->setEnabled(aCardInfoDockVisible->isChecked());
         return;
     }
 
-    if(o == aDeckDockVisible)
-    {
+    if (o == aDeckDockVisible) {
         deckDock->setVisible(aDeckDockVisible->isChecked());
         aDeckDockFloating->setEnabled(aDeckDockVisible->isChecked());
         return;
     }
 
-    if(o == aFilterDockVisible)
-    {
+    if (o == aFilterDockVisible) {
         filterDock->setVisible(aFilterDockVisible->isChecked());
         aFilterDockFloating->setEnabled(aFilterDockVisible->isChecked());
         return;
@@ -1061,20 +1162,17 @@ void TabDeckEditor::dockVisibleTriggered()
 void TabDeckEditor::dockFloatingTriggered()
 {
     QObject *o = sender();
-    if(o == aCardInfoDockFloating)
-    {
+    if (o == aCardInfoDockFloating) {
         cardInfoDock->setFloating(aCardInfoDockFloating->isChecked());
         return;
     }
 
-    if(o == aDeckDockFloating)
-    {
+    if (o == aDeckDockFloating) {
         deckDock->setFloating(aDeckDockFloating->isChecked());
         return;
     }
 
-    if(o == aFilterDockFloating)
-    {
+    if (o == aFilterDockFloating) {
         filterDock->setFloating(aFilterDockFloating->isChecked());
         return;
     }
@@ -1083,20 +1181,17 @@ void TabDeckEditor::dockFloatingTriggered()
 void TabDeckEditor::dockTopLevelChanged(bool topLevel)
 {
     QObject *o = sender();
-    if(o == cardInfoDock)
-    {
+    if (o == cardInfoDock) {
         aCardInfoDockFloating->setChecked(topLevel);
         return;
     }
 
-    if(o == deckDock)
-    {
+    if (o == deckDock) {
         aDeckDockFloating->setChecked(topLevel);
         return;
     }
 
-    if(o == filterDock)
-    {
+    if (o == filterDock) {
         aFilterDockFloating->setChecked(topLevel);
         return;
     }
@@ -1105,4 +1200,15 @@ void TabDeckEditor::dockTopLevelChanged(bool topLevel)
 void TabDeckEditor::saveDbHeaderState()
 {
     settingsCache->layouts().setDeckEditorDbHeaderState(databaseView->header()->saveState());
+}
+
+void TabDeckEditor::setSaveStatus(bool newStatus)
+{
+    aSaveDeck->setEnabled(newStatus);
+    aSaveDeckAs->setEnabled(newStatus);
+    aSaveDeckToClipboard->setEnabled(newStatus);
+    aSaveDeckToClipboardRaw->setEnabled(newStatus);
+    saveDeckToClipboardMenu->setEnabled(newStatus);
+    aPrintDeck->setEnabled(newStatus);
+    analyzeDeckMenu->setEnabled(newStatus);
 }

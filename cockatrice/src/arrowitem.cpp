@@ -2,16 +2,16 @@
 #include <cmath>
 
 #include "arrowitem.h"
-#include "playertarget.h"
-#include "carditem.h"
 #include "carddatabase.h"
+#include "carditem.h"
 #include "cardzone.h"
 #include "player.h"
+#include "playertarget.h"
 #include "settingscache.h"
-#include <QPainter>
-#include <QGraphicsSceneMouseEvent>
-#include <QGraphicsScene>
 #include <QDebug>
+#include <QGraphicsScene>
+#include <QGraphicsSceneMouseEvent>
+#include <QPainter>
 
 #include "color.h"
 #include "pb/command_attach_card.pb.h"
@@ -19,7 +19,8 @@
 #include "pb/command_delete_arrow.pb.h"
 
 ArrowItem::ArrowItem(Player *_player, int _id, ArrowTarget *_startItem, ArrowTarget *_targetItem, const QColor &_color)
-    : QGraphicsItem(), player(_player), id(_id), startItem(_startItem), targetItem(_targetItem), color(_color), fullColor(true)
+    : QGraphicsItem(), player(_player), id(_id), startItem(_startItem), targetItem(_targetItem), color(_color),
+      fullColor(true)
 {
     qDebug() << "ArrowItem constructor: startItem=" << static_cast<QGraphicsItem *>(startItem);
     setZValue(2000000005);
@@ -60,7 +61,8 @@ void ArrowItem::updatePath()
     if (!targetItem)
         return;
 
-    QPointF endPoint = targetItem->mapToScene(QPointF(targetItem->boundingRect().width() / 2, targetItem->boundingRect().height() / 2));
+    QPointF endPoint = targetItem->mapToScene(
+        QPointF(targetItem->boundingRect().width() / 2, targetItem->boundingRect().height() / 2));
     updatePath(endPoint);
 }
 
@@ -68,13 +70,15 @@ void ArrowItem::updatePath(const QPointF &endPoint)
 {
     const double arrowWidth = 15.0;
     const double headWidth = 40.0;
-    const double headLength = headWidth / pow(2, 0.5); // aka headWidth / sqrt (2) but this produces a compile error with MSVC++
+    const double headLength =
+        headWidth / pow(2, 0.5); // aka headWidth / sqrt (2) but this produces a compile error with MSVC++
     const double phi = 15;
 
     if (!startItem)
         return;
 
-    QPointF startPoint = startItem->mapToScene(QPointF(startItem->boundingRect().width() / 2, startItem->boundingRect().height() / 2));
+    QPointF startPoint =
+        startItem->mapToScene(QPointF(startItem->boundingRect().width() / 2, startItem->boundingRect().height() / 2));
     QLineF line(startPoint, endPoint);
     qreal lineLength = line.length();
 
@@ -92,10 +96,14 @@ void ArrowItem::updatePath(const QPointF &endPoint)
         QPointF arrowBodyEndPoint = centerLine.pointAtPercent(percentage);
         QLineF testLine(arrowBodyEndPoint, centerLine.pointAtPercent(percentage + 0.001));
         qreal alpha = testLine.angle() - 90;
-        QPointF endPoint1 = arrowBodyEndPoint + arrowWidth / 2 * QPointF(cos(alpha * M_PI / 180), -sin(alpha * M_PI / 180));
-        QPointF endPoint2 = arrowBodyEndPoint + arrowWidth / 2 * QPointF(-cos(alpha * M_PI / 180), sin(alpha * M_PI / 180));
-        QPointF point1 = endPoint1 + (headWidth - arrowWidth) / 2 * QPointF(cos(alpha * M_PI / 180), -sin(alpha * M_PI / 180));
-        QPointF point2 = endPoint2 + (headWidth - arrowWidth) / 2 * QPointF(-cos(alpha * M_PI / 180), sin(alpha * M_PI / 180));
+        QPointF endPoint1 =
+            arrowBodyEndPoint + arrowWidth / 2 * QPointF(cos(alpha * M_PI / 180), -sin(alpha * M_PI / 180));
+        QPointF endPoint2 =
+            arrowBodyEndPoint + arrowWidth / 2 * QPointF(-cos(alpha * M_PI / 180), sin(alpha * M_PI / 180));
+        QPointF point1 =
+            endPoint1 + (headWidth - arrowWidth) / 2 * QPointF(cos(alpha * M_PI / 180), -sin(alpha * M_PI / 180));
+        QPointF point2 =
+            endPoint2 + (headWidth - arrowWidth) / 2 * QPointF(-cos(alpha * M_PI / 180), sin(alpha * M_PI / 180));
 
         path = QPainterPath(-arrowWidth / 2 * QPointF(cos((phi - 90) * M_PI / 180), sin((phi - 90) * M_PI / 180)));
         path.quadTo(c, endPoint1);
@@ -130,18 +138,19 @@ void ArrowItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
     }
 
     QList<QGraphicsItem *> colliding = scene()->items(event->scenePos());
-    for (int i = 0; i < colliding.size(); ++i)
+    for (int i = 0; i < colliding.size(); ++i) {
         if (qgraphicsitem_cast<CardItem *>(colliding[i])) {
             event->ignore();
             return;
         }
+    }
 
-        event->accept();
-        if (event->button() == Qt::RightButton) {
-            Command_DeleteArrow cmd;
-            cmd.set_arrow_id(id);
-            player->sendGameCommand(cmd);
-        }
+    event->accept();
+    if (event->button() == Qt::RightButton) {
+        Command_DeleteArrow cmd;
+        cmd.set_arrow_id(id);
+        player->sendGameCommand(cmd);
+    }
 }
 
 ArrowDragItem::ArrowDragItem(Player *_owner, ArrowTarget *_startItem, const QColor &_color)
@@ -166,35 +175,39 @@ void ArrowDragItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
     QList<QGraphicsItem *> colliding = scene()->items(endPos);
     ArrowTarget *cursorItem = 0;
     qreal cursorItemZ = -1;
-    for (int i = colliding.size() - 1; i >= 0; i--)
-        if (qgraphicsitem_cast<PlayerTarget *>(colliding.at(i)) || qgraphicsitem_cast<CardItem *>(colliding.at(i)))
+    for (int i = colliding.size() - 1; i >= 0; i--) {
+        if (qgraphicsitem_cast<PlayerTarget *>(colliding.at(i)) || qgraphicsitem_cast<CardItem *>(colliding.at(i))) {
             if (colliding.at(i)->zValue() > cursorItemZ) {
                 cursorItem = static_cast<ArrowTarget *>(colliding.at(i));
                 cursorItemZ = cursorItem->zValue();
             }
-            if ((cursorItem != targetItem) && targetItem) {
-                targetItem->setBeingPointedAt(false);
-                targetItem->removeArrowTo(this);
-            }
-            if (!cursorItem) {
-                fullColor = false;
-                targetItem = 0;
-                updatePath(endPos);
-            } else {
-                if (cursorItem != targetItem) {
-                    fullColor = true;
-                    if (cursorItem != startItem) {
-                        cursorItem->setBeingPointedAt(true);
-                        cursorItem->addArrowTo(this);
-                    }
-                    targetItem = cursorItem;
-                }
-                updatePath();
-            }
-            update();
+        }
+    }
 
-            for (int i = 0; i < childArrows.size(); ++i)
-                childArrows[i]->mouseMoveEvent(event);
+    if ((cursorItem != targetItem) && targetItem) {
+        targetItem->setBeingPointedAt(false);
+        targetItem->removeArrowTo(this);
+    }
+    if (!cursorItem) {
+        fullColor = false;
+        targetItem = 0;
+        updatePath(endPos);
+    } else {
+        if (cursorItem != targetItem) {
+            fullColor = true;
+            if (cursorItem != startItem) {
+                cursorItem->setBeingPointedAt(true);
+                cursorItem->addArrowTo(this);
+            }
+            targetItem = cursorItem;
+        }
+        updatePath();
+    }
+    update();
+
+    for (int i = 0; i < childArrows.size(); ++i) {
+        childArrows[i]->mouseMoveEvent(event);
+    }
 }
 
 void ArrowDragItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
@@ -224,15 +237,15 @@ void ArrowDragItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
             PlayerTarget *targetPlayer = qgraphicsitem_cast<PlayerTarget *>(targetItem);
             cmd.set_target_player_id(targetPlayer->getOwner()->getId());
         }
-        if (startZone->getName().compare("hand") == 0)  {
+        if (startZone->getName().compare("hand") == 0) {
             startCard->playCard(false);
-            CardInfo *ci = startCard->getInfo();
+            CardInfoPtr ci = startCard->getInfo();
             if (ci && (((!settingsCache->getPlayToStack() && ci->getTableRow() == 3) ||
-                ((settingsCache->getPlayToStack() && ci->getTableRow() != 0) &&
-                startCard->getZone()->getName().toStdString() != "stack"))))
+                        ((settingsCache->getPlayToStack() && ci->getTableRow() != 0) &&
+                         startCard->getZone()->getName().toStdString() != "stack"))))
                 cmd.set_start_zone("stack");
             else
-                cmd.set_start_zone(settingsCache->getPlayToStack() ? "stack" :"table");
+                cmd.set_start_zone(settingsCache->getPlayToStack() ? "stack" : "table");
         }
         player->sendGameCommand(cmd);
     }
@@ -257,27 +270,31 @@ void ArrowAttachItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
     QList<QGraphicsItem *> colliding = scene()->items(endPos);
     ArrowTarget *cursorItem = 0;
     qreal cursorItemZ = -1;
-    for (int i = colliding.size() - 1; i >= 0; i--)
-        if (qgraphicsitem_cast<CardItem *>(colliding.at(i)))
+    for (int i = colliding.size() - 1; i >= 0; i--) {
+        if (qgraphicsitem_cast<CardItem *>(colliding.at(i))) {
             if (colliding.at(i)->zValue() > cursorItemZ) {
                 cursorItem = static_cast<ArrowTarget *>(colliding.at(i));
                 cursorItemZ = cursorItem->zValue();
             }
+        }
+    }
 
-            if ((cursorItem != targetItem) && targetItem)
-                targetItem->setBeingPointedAt(false);
-            if (!cursorItem) {
-                fullColor = false;
-                targetItem = 0;
-                updatePath(endPos);
-            } else {
-                fullColor = true;
-                if (cursorItem != startItem)
-                    cursorItem->setBeingPointedAt(true);
-                targetItem = cursorItem;
-                updatePath();
-            }
-            update();
+    if ((cursorItem != targetItem) && targetItem) {
+        targetItem->setBeingPointedAt(false);
+    }
+    if (!cursorItem) {
+        fullColor = false;
+        targetItem = 0;
+        updatePath(endPos);
+    } else {
+        fullColor = true;
+        if (cursorItem != startItem) {
+            cursorItem->setBeingPointedAt(true);
+        }
+        targetItem = cursorItem;
+        updatePath();
+    }
+    update();
 }
 
 void ArrowAttachItem::mouseReleaseEvent(QGraphicsSceneMouseEvent * /*event*/)

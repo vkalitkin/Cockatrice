@@ -22,24 +22,32 @@
 
 #include <QList>
 #include <QMainWindow>
-#include <QSystemTrayIcon>
-#include <QProcess>
 #include <QMessageBox>
+#include <QProcess>
+#include <QSystemTrayIcon>
 #include <QtNetwork>
 
 #include "abstractclient.h"
 #include "pb/response.pb.h"
-#include "update_checker.h"
 
-class TabSupervisor;
-class RemoteClient;
+class DlgConnect;
+class DlgViewLog;
+class GameReplay;
+class HandlePublicServers;
 class LocalClient;
 class LocalServer;
-class ServerInfo_User;
 class QThread;
+class RemoteClient;
+class ServerInfo_User;
+class TabSupervisor;
+class WndSets;
+class DlgTipOfTheDay;
 
-class MainWindow : public QMainWindow {
+class MainWindow : public QMainWindow
+{
     Q_OBJECT
+public slots:
+    void actCheckCardUpdates();
 private slots:
     void updateTabMenu(const QList<QMenu *> &newMenuList);
     void statusChanged(ClientStatus _status);
@@ -67,16 +75,18 @@ private slots:
     void actRegister();
     void actSettings();
     void actExit();
-    
+    void actForgotPasswordRequest();
     void actAbout();
+    void actTips();
     void actUpdate();
     void actViewLog();
-
+    void forgotPasswordSuccess();
+    void forgotPasswordError();
+    void promptForgotPasswordReset();
     void iconActivated(QSystemTrayIcon::ActivationReason reason);
-
+    void promptForgotPasswordChallenge();
     void showWindowIfHidden();
 
-    void actCheckCardUpdates();
     void cardUpdateError(QProcess::ProcessError err);
     void cardUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void refreshShortcuts();
@@ -88,8 +98,11 @@ private slots:
     void actOpenCustomsetsFolder();
     void actAddCustomSet();
 
-    void actEditSets();
+    void actManageSets();
     void actEditTokens();
+
+    void alertForcedOracleRun(const QString &);
+
 private:
     static const QString appName;
     static const QStringList fileNameFilters;
@@ -102,35 +115,50 @@ private:
     void createTrayActions();
     int getNextCustomSetPrefix(QDir dataDir);
     // TODO: add a preference item to choose updater name for other games
-    inline QString getCardUpdaterBinaryName() { return "oracle"; };
+    inline QString getCardUpdaterBinaryName()
+    {
+        return "oracle";
+    };
 
     QList<QMenu *> tabMenus;
-    QMenu *cockatriceMenu, *dbMenu, *helpMenu;
+    QMenu *cockatriceMenu, *dbMenu, *helpMenu, *trayIconMenu;
     QAction *aConnect, *aDisconnect, *aSinglePlayer, *aWatchReplay, *aDeckEditor, *aFullScreen, *aSettings, *aExit,
-        *aAbout, *aCheckCardUpdates, *aRegister, *aUpdate, *aViewLog;
-    QAction *aEditSets, *aEditTokens, *aOpenCustomFolder, *aOpenCustomsetsFolder, *aAddCustomSet;
+        *aAbout, *aTips, *aCheckCardUpdates, *aRegister, *aUpdate, *aViewLog, *closeAction;
+    QAction *aManageSets, *aEditTokens, *aOpenCustomFolder, *aOpenCustomsetsFolder, *aAddCustomSet;
     TabSupervisor *tabSupervisor;
-
-    QMenu *trayIconMenu;
-
-    QAction *closeAction;
-
+    WndSets *wndSets;
     RemoteClient *client;
     QThread *clientThread;
-    
     LocalServer *localServer;
     bool bHasActivated;
-
     QMessageBox serverShutdownMessageBox;
-    QProcess * cardUpdateProcess;
+    QProcess *cardUpdateProcess;
+    DlgViewLog *logviewDialog;
+    DlgConnect *dlgConnect;
+    GameReplay *replay;
+    DlgTipOfTheDay *tip;
 
 public:
-    MainWindow(QWidget *parent = 0);
-    ~MainWindow();
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
+
 protected:
-    void closeEvent(QCloseEvent *event);
-    void changeEvent(QEvent *event);
-    QString extractInvalidUsernameMessage(QString & in);
+    void closeEvent(QCloseEvent *event) override;
+    void changeEvent(QEvent *event) override;
+    QString extractInvalidUsernameMessage(QString &in);
+};
+
+class MainUpdateHelper : public QObject
+{
+    Q_OBJECT
+
+signals:
+    void newVersionDetected(QString);
+
+public:
+    explicit MainUpdateHelper() = default;
+    ~MainUpdateHelper() override = default;
+    void testForNewVersion();
 };
 
 #endif

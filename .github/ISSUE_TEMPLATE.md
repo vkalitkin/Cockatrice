@@ -1,11 +1,14 @@
-<b>OS:</b>
-*Override this line with the exact operating system you are running! (e.g. "Win 7 SP1", "OS X 10.8.5", "Ubuntu 15.10" ...)*
+<b>System Information:</b>
+  <!-- Go to "Help → View Debug Log" and copy all lines above the separation here! -->
 
-<b>Cockatrice version:</b>
-*Put your Cockatrice version number & build date here! You find them inside the app: `Help` --> `About Cockatrice` (e.g. "2d53ce9 (2016-02-18)"). If you can't access this menu for any reason, please include the full filename of the installer you used.*
+  <!-- If you can't install Cockatrice to access that information, make
+       sure to include your OS and the app version from the setup file here -->
+__________________________________________________________________________________________
 
-___
-<br>
+  <!-- Explain your issue/request/suggestion in detail here! -->
 
-
-*Explain your Issue/Request/Suggestion in detail here!*
+  <!-- This repository is ONLY about development of the Cockatrice app.
+       If you have any problems with a server (e.g. registering, connecting, ban...)
+       you have to contact that server's owner/admin. 
+       Check this list of public servers with webpage links and contact details:
+       https://github.com/Cockatrice/Cockatrice/wiki/Public-Servers -->

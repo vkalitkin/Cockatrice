@@ -2,7 +2,7 @@
 # will be needed by Qt in order to access https urls.
 
 if (WIN32)
-  # Get standard installation paths for OpenSSL under Windows 
+  # Get standard installation paths for OpenSSL under Windows
 
   # http://www.slproweb.com/products/Win32OpenSSL.html
 
@@ -15,6 +15,7 @@ if (WIN32)
       )
     file(TO_CMAKE_PATH "$ENV{PROGRAMFILES}" _programfiles)
     set(_OPENSSL_ROOT_PATHS
+      "C:/Tools/vcpkg/installed/x64-windows/bin"
       "${_programfiles}/OpenSSL-Win64"
       "C:/OpenSSL-Win64/"
       )
@@ -28,6 +29,7 @@ if (WIN32)
       )
     file(TO_CMAKE_PATH "$ENV{PROGRAMFILES}" _programfiles)
     set(_OPENSSL_ROOT_PATHS
+      "C:/Tools/vcpkg/installed/x86-windows/bin"
       "${_programfiles}/OpenSSL"
       "${_programfiles}/OpenSSL-Win32"
       "C:/OpenSSL/"
@@ -48,9 +50,10 @@ set(_OPENSSL_ROOT_HINTS_AND_PATHS
     PATHS ${_OPENSSL_ROOT_PATHS}
     )
 
-# Even if the dll is 64bit, it's still suffixed as *32.dll
-FIND_FILE(WIN32SSLRUNTIME_LIBEAY NAMES libeay32.dll ${_OPENSSL_ROOT_HINTS_AND_PATHS})
-FIND_FILE(WIN32SSLRUNTIME_SSLEAY NAMES ssleay32.dll ${_OPENSSL_ROOT_HINTS_AND_PATHS})
+# For OpenSSL < 1.1, they are named libeay32 and ssleay32 and even if the dll is 64bit, it's still suffixed as *32.dll
+# For OpenSSL >= 1.1, they are named libcrypto and libssl with no suffix
+FIND_FILE(WIN32SSLRUNTIME_LIBEAY NAMES libeay32.dll libcrypto.dll ${_OPENSSL_ROOT_HINTS_AND_PATHS})
+FIND_FILE(WIN32SSLRUNTIME_SSLEAY NAMES ssleay32.dll libssl.dll ${_OPENSSL_ROOT_HINTS_AND_PATHS})
 
 
 IF(WIN32SSLRUNTIME_LIBEAY AND WIN32SSLRUNTIME_SSLEAY)

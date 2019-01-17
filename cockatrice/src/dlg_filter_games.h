@@ -1,19 +1,22 @@
 #ifndef DLG_FILTER_GAMES_H
 #define DLG_FILTER_GAMES_H
 
-#include <QDialog>
-#include <QSet>
-#include <QMap>
-#include <QCheckBox>
 #include "gamesmodel.h"
+#include <QCheckBox>
+#include <QDialog>
+#include <QMap>
+#include <QSet>
 
 class QCheckBox;
+class QGroupBox;
 class QLineEdit;
 class QSpinBox;
 
-class DlgFilterGames : public QDialog {
+class DlgFilterGames : public QDialog
+{
     Q_OBJECT
 private:
+    QGroupBox *generalGroupBox;
     QCheckBox *showBuddiesOnlyGames;
     QCheckBox *unavailableGamesVisibleCheckBox;
     QCheckBox *showPasswordProtectedGames;
@@ -28,8 +31,11 @@ private:
 
 private slots:
     void actOk();
+
 public:
-    DlgFilterGames(const QMap<int, QString> &_allGameTypes, const GamesProxyModel *_gamesProxyModel, QWidget *parent = 0);
+    DlgFilterGames(const QMap<int, QString> &_allGameTypes,
+                   const GamesProxyModel *_gamesProxyModel,
+                   QWidget *parent = 0);
 
     bool getUnavailableGamesVisible() const;
     void setUnavailableGamesVisible(bool _unavailableGamesVisible);

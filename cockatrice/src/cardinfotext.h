@@ -3,11 +3,12 @@
 
 #include <QFrame>
 
+#include "carddatabase.h"
 class QLabel;
 class QTextEdit;
-class CardInfo;
 
-class CardInfoText : public QFrame {
+class CardInfoText : public QFrame
+{
     Q_OBJECT
 
 private:
@@ -19,14 +20,17 @@ private:
     QLabel *loyaltyLabel1, *loyaltyLabel2;
     QTextEdit *textLabel;
 
-    CardInfo *info;
+    CardInfoPtr info;
+
+    void resetLabels();
 
 public:
     CardInfoText(QWidget *parent = 0);
     void retranslateUi();
+    void setInvalidCardName(const QString &cardName);
 
 public slots:
-    void setCard(CardInfo *card);
+    void setCard(CardInfoPtr card);
 };
 
 #endif

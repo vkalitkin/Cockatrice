@@ -1,17 +1,15 @@
 #include "cardframe.h"
 
-#include "carditem.h"
-#include "carddatabase.h"
-#include "main.h"
 #include "cardinfopicture.h"
 #include "cardinfotext.h"
+#include "carditem.h"
+#include "main.h"
 #include "settingscache.h"
 
 #include <QSplitter>
 #include <QVBoxLayout>
 
-CardFrame::CardFrame(const QString &cardName, QWidget *parent)
-    : QTabWidget(parent), info(nullptr), cardTextOnly(false)
+CardFrame::CardFrame(const QString &cardName, QWidget *parent) : QTabWidget(parent), info(nullptr), cardTextOnly(false)
 {
     setContentsMargins(3, 3, 3, 3);
     pic = new CardInfoPicture();
@@ -69,11 +67,10 @@ void CardFrame::retranslateUi()
 
 void CardFrame::setViewMode(int mode)
 {
-    if(currentIndex() != mode)
+    if (currentIndex() != mode)
         setCurrentIndex(mode);
 
-    switch(mode)
-    {
+    switch (mode) {
         case ImageOnlyView:
         case TextOnlyView:
             tab1Layout->addWidget(pic);
@@ -83,18 +80,24 @@ void CardFrame::setViewMode(int mode)
             splitter->addWidget(pic);
             splitter->addWidget(text);
             break;
+        default:
+            break;
     }
 
     settingsCache->setCardInfoViewMode(mode);
 }
 
-void CardFrame::setCard(CardInfo *card)
+void CardFrame::setCard(CardInfoPtr card)
 {
-    if (info)
-        disconnect(info, nullptr, this, nullptr);
+    if (info) {
+        disconnect(info.data(), nullptr, this, nullptr);
+    }
+
     info = card;
-    if(info)
-        connect(info, SIGNAL(destroyed()), this, SLOT(clear()));
+
+    if (info) {
+        connect(info.data(), SIGNAL(destroyed()), this, SLOT(clear()));
+    }
 
     text->setCard(info);
     pic->setCard(info);
@@ -102,15 +105,17 @@ void CardFrame::setCard(CardInfo *card)
 
 void CardFrame::setCard(const QString &cardName)
 {
-    setCard(db->getCard(cardName));
+    setCard(db->getCardBySimpleName(cardName));
 }
 
 void CardFrame::setCard(AbstractCardItem *card)
 {
-    setCard(card->getInfo());
+    if (card) {
+        setCard(card->getInfo());
+    }
 }
 
 void CardFrame::clear()
 {
-    setCard((CardInfo*) nullptr);
+    setCard((CardInfoPtr) nullptr);
 }

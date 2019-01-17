@@ -9,36 +9,65 @@ class ServersSettings : public SettingsManager
     Q_OBJECT
     friend class SettingsCache;
 
-public:    
+public:
     int getPreviousHostLogin();
+    int getPrevioushostindex(const QString &);
     QStringList getPreviousHostList();
-    int getPrevioushostindex();
+    QString getPrevioushostName();
     QString getHostname(QString defaultHost = "");
     QString getPort(QString defaultPort = "");
     QString getPlayerName(QString defaultName = "");
+    QString getFPHostname(QString defaultHost = "");
+    QString getFPPort(QString defaultPort = "");
+    QString getFPPlayerName(QString defaultName = "");
     QString getPassword();
-    int getSavePassword();
+    QString getSaveName(QString defaultname = "");
+    QString getSite(QString defaultName = "");
+    bool getSavePassword();
     int getAutoConnect();
 
     void setPreviousHostLogin(int previous);
+    void setPrevioushostName(const QString &);
     void setPreviousHostList(QStringList list);
-    void setPrevioushostindex(int index);
     void setHostName(QString hostname);
     void setPort(QString port);
     void setPlayerName(QString playerName);
-    void setPassword(QString password);
-    void setSavePassword(int save);
     void setAutoConnect(int autoconnect);
-signals:
+    void setSite(QString site);
+    void setFPHostName(QString hostname);
+    void setPassword(QString password);
+    void setFPPort(QString port);
+    void setSavePassword(int save);
+    void setFPPlayerName(QString playerName);
+    void addNewServer(const QString &saveName,
+                      const QString &serv,
+                      const QString &port,
+                      const QString &username,
+                      const QString &password,
+                      bool savePassword,
+                      const QString &site = QString());
+    void removeServer(QString servAddr);
+    bool updateExistingServer(QString saveName,
+                              QString serv,
+                              QString port,
+                              QString username,
+                              QString password,
+                              bool savePassword,
+                              QString site = QString());
 
-public slots:
+    bool updateExistingServerWithoutLoss(QString saveName,
+                                         QString serv = QString(),
+                                         QString port = QString(),
+                                         QString site = QString(),
+                                         QString username = QString(),
+                                         QString password = QString(),
+                                         bool savePassword = true);
+    void setClearDebugLogStatus(bool abIsChecked);
+    bool getClearDebugLogStatus(bool abDefaultValue);
 
 private:
-    ServersSettings(QString settingPath,QObject *parent = 0);
-    ServersSettings( const ServersSettings& /*other*/ );
-    ServersSettings( ServersSettings& /*other*/ );
-    ServersSettings( volatile const ServersSettings& /*other*/ );
-    ServersSettings( volatile ServersSettings& /*other*/ );       
+    explicit ServersSettings(QString settingPath, QObject *parent = nullptr);
+    ServersSettings(const ServersSettings & /*other*/);
 };
 
 #endif // SERVERSSETTINGS_H

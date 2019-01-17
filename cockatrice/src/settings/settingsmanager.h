@@ -10,7 +10,8 @@ class SettingsManager : public QObject
 {
     Q_OBJECT
 public:
-    SettingsManager(QString settingPath, QObject *parent = 0);
+    explicit SettingsManager(QString settingPath, QObject *parent = nullptr);
+    QVariant getValue(QString name, QString group = "", QString subGroup = "");
 
 signals:
 
@@ -18,8 +19,8 @@ public slots:
 
 protected:
     QSettings settings;
-    QVariant getValue(QString name, QString group = "", QString subGroup = "" );
-    void setValue(QVariant value, QString name, QString group = "", QString subGroup = "" );
+    void setValue(QVariant value, QString name, QString group = "", QString subGroup = "");
+    void deleteValue(QString name, QString group = "", QString subGroup = "");
 };
 
 #endif // SETTINGSMANAGER_H
